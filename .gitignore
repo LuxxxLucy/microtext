@@ -1,6 +1,6 @@
 tests/test_dump
-examples/demo
-examples/showcase
+examples/demo_1_showcase
+examples/demo_2_raylib
 output/
 *.o
 .DS_Store

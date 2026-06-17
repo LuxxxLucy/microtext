@@ -11,7 +11,7 @@ microtext instead delegates to the native engine, so it gains shaping, fallback,
 ![Latin, CJK, and Korean fallback; Arabic and Hebrew bidi; full-color emoji; rich multi-font runs; OpenType small caps; and a width-wrapped paragraph with a hard break, all rendered by microtext](docs/showcase.png)
 
 Every glyph above is rendered by microtext onto one bitmap.
-`examples/showcase.c` produces this image headlessly; `make showcase` regenerates it.
+`examples/demo_1_showcase.c` produces this image headlessly; `make demo_1_showcase` regenerates it.
 
 ## Usage
 
@@ -110,14 +110,14 @@ Each backend sits behind the same `mt_*` API; the other two are stubbed with a c
 ## Build
 
 ```sh
-make test       # render sample runs to output/ and check them (exits non-zero on failure)
-make showcase   # render every feature to output/showcase.png (no dependencies)
-make run        # the interactive raylib demo (needs brew raylib)
+make test             # render sample runs to output/ and check them (exits non-zero on failure)
+make demo_1_showcase  # render every feature to output/showcase.png (no dependencies)
+make demo_2_raylib    # the interactive raylib demo (needs brew raylib)
 ```
 
 Two demos render the same features through two integration paths.
-`examples/showcase.c` is headless: it composites every feature onto one bitmap with `mt_render` and `mt_text_wrap` and writes the PNG shown above, so it builds and runs with no dependency beyond the macOS frameworks.
-`examples/raylib_demo.c` is the live path: it uploads each `mt_render` result to a `Texture2D` through the cache in `examples/mt_raylib.h` and draws it per frame.
+`examples/demo_1_showcase.c` is headless: it composites every feature onto one bitmap with `mt_render` and `mt_text_wrap` and writes the PNG shown above, so it builds and runs with no dependency beyond the macOS frameworks.
+`examples/demo_2_raylib.c` is the live path: it uploads each `mt_render` result to a `Texture2D` through the cache in `examples/mt_raylib.h` and draws it per frame.
 
 ## License
 
