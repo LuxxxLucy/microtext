@@ -7,12 +7,18 @@ RL_FLAGS := -I$(RAYLIB)/include -L$(RAYLIB)/lib -lraylib
 RL_FW    := -framework Cocoa -framework IOKit -framework CoreVideo \
             -framework OpenGL
 
-.PHONY: all test demo run clean
+.PHONY: all test demo run showcase clean
 all: test demo
 
 test: tests/test_dump
 	./tests/test_dump
 tests/test_dump: tests/test_dump.c microtext.h tests/3rd/stb_image_write.h
+	$(CC) $(CFLAGS) $< -o $@ $(MAC_FW)
+
+showcase: examples/showcase
+	@mkdir -p output
+	./examples/showcase
+examples/showcase: examples/showcase.c microtext.h tests/3rd/stb_image_write.h
 	$(CC) $(CFLAGS) $< -o $@ $(MAC_FW)
 
 demo: examples/demo
@@ -23,4 +29,4 @@ run: demo
 	./examples/demo
 
 clean:
-	rm -rf tests/test_dump examples/demo output
+	rm -rf tests/test_dump examples/demo examples/showcase output

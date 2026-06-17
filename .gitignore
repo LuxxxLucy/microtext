@@ -1,5 +1,6 @@
 tests/test_dump
 examples/demo
+examples/showcase
 output/
 *.o
 .DS_Store
