@@ -1,0 +1,5 @@
+tests/test_dump
+examples/demo
+output/
+*.o
+.DS_Store
