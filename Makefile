@@ -10,7 +10,7 @@ RL_FLAGS := -I$(RAYLIB)/include -L$(RAYLIB)/lib -lraylib
 RL_FW    := -framework Cocoa -framework IOKit -framework CoreVideo \
             -framework OpenGL
 
-.PHONY: all test sanitize leaks demo_1_showcase demo_2_raylib clean
+.PHONY: all test sanitize leaks golden demo_1_showcase demo_2_raylib clean
 all: test examples/demo_1_showcase examples/demo_2_raylib
 
 test: tests/test_dump
@@ -30,6 +30,12 @@ leaks: tests/test_dump
 	codesign -s - -f --entitlements tests/leaks.entitlements tests/test_dump
 	leaks --atExit -- ./tests/test_dump
 
+# Compare rendered output to committed reference PNGs (tied to the macOS/font
+# version that produced them). `MICROTEXT_UPDATE_GOLDEN=1 make golden` regenerates.
+golden: tests/golden.c microtext.h tests/3rd/stb_image_write.h tests/3rd/stb_image.h
+	$(CC) $(CFLAGS) $< -o tests/golden_test $(MAC_FW)
+	./tests/golden_test
+
 demo_1_showcase: examples/demo_1_showcase
 	@mkdir -p output
 	./examples/demo_1_showcase
@@ -42,5 +48,5 @@ examples/demo_2_raylib: examples/demo_2_raylib.c examples/mt_raylib.h microtext.
 	$(CC) $(CFLAGS) $< -o $@ $(RL_FLAGS) $(MAC_FW) $(RL_FW)
 
 clean:
-	rm -rf tests/test_dump tests/test_dump_san \
+	rm -rf tests/test_dump tests/test_dump_san tests/golden_test \
 	       examples/demo_1_showcase examples/demo_2_raylib output *.dSYM tests/*.dSYM
