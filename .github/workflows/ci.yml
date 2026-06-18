@@ -17,3 +17,5 @@ jobs:
         run: make sanitize
       - name: Leak check
         run: make leaks
+      - name: Fuzz seed replay
+        run: make fuzz

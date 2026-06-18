@@ -10,7 +10,7 @@ RL_FLAGS := -I$(RAYLIB)/include -L$(RAYLIB)/lib -lraylib
 RL_FW    := -framework Cocoa -framework IOKit -framework CoreVideo \
             -framework OpenGL
 
-.PHONY: all test sanitize leaks golden demo_1_showcase demo_2_raylib clean
+.PHONY: all test sanitize leaks golden fuzz demo_1_showcase demo_2_raylib clean
 all: test examples/demo_1_showcase examples/demo_2_raylib
 
 test: tests/test_dump
@@ -36,6 +36,13 @@ golden: tests/golden.c microtext.h tests/3rd/stb_image_write.h tests/3rd/stb_ima
 	$(CC) $(CFLAGS) $< -o tests/golden_test $(MAC_FW)
 	./tests/golden_test
 
+# Fuzz the shaping and hit-test walkers. This standalone driver replays built-in
+# seeds (and any corpus files passed as arguments) under ASan/UBSan and runs
+# anywhere; see tests/fuzz.c for the coverage-guided libFuzzer build.
+fuzz: tests/fuzz.c microtext.h
+	$(CC) $(SANFLAGS) $< -o tests/fuzz $(MAC_FW)
+	./tests/fuzz
+
 demo_1_showcase: examples/demo_1_showcase
 	@mkdir -p output
 	./examples/demo_1_showcase
@@ -48,5 +55,5 @@ examples/demo_2_raylib: examples/demo_2_raylib.c examples/mt_raylib.h microtext.
 	$(CC) $(CFLAGS) $< -o $@ $(RL_FLAGS) $(MAC_FW) $(RL_FW)
 
 clean:
-	rm -rf tests/test_dump tests/test_dump_san tests/golden_test \
+	rm -rf tests/test_dump tests/test_dump_san tests/golden_test tests/fuzz \
 	       examples/demo_1_showcase examples/demo_2_raylib output *.dSYM tests/*.dSYM

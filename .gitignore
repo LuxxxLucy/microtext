@@ -1,6 +1,7 @@
 tests/test_dump
 tests/test_dump_san
 tests/golden_test
+tests/fuzz
 examples/demo_1_showcase
 examples/demo_2_raylib
 output/
