@@ -55,7 +55,7 @@ static float run_base(const mt_font *f, const char *txt, mt_color col, int x,
 }
 
 /* Render one mt_shaped line with its baseline at (x, baseline). */
-static void line_base(mt_shaped *ln, int x, int baseline)
+static void line_base(const mt_shaped *ln, int x, int baseline)
 {
     int w, h;
     mt_metrics m = mt_shaped_metrics(ln);
@@ -158,7 +158,7 @@ int main(void)
         mt_block *blk = mt_text_wrap(t, 660.0f);
         int top = b;
         for (int i = 0; i < mt_block_lines(blk); i++) {
-            mt_shaped *ln = mt_block_line(blk, i);
+            const mt_shaped *ln = mt_block_line(blk, i);
             mt_metrics m = mt_shaped_metrics(ln);
             line_base(ln, SAMP_X, top + (int)(m.ascent + 0.5f));
             top += (int)(m.height + 0.5f);

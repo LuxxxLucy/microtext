@@ -11,7 +11,7 @@ microtext instead delegates to the native engine, so it gains shaping, fallback,
 ![Latin, CJK, and Korean fallback; Arabic and Hebrew bidi; full-color emoji; rich multi-font runs; OpenType small caps; and a width-wrapped paragraph with a hard break, all rendered by microtext](docs/showcase.png)
 
 Every glyph above is rendered by microtext onto one bitmap.
-`examples/demo_1_showcase.c` produces this image headlessly; `make demo_1_showcase` regenerates it.
+`examples/demo_1_showcase.c` produces this image headlessly; `make demo_1_showcase` rebuilds it into `output/showcase.png` (`docs/showcase.png` is the committed copy).
 
 ## Usage
 
@@ -52,6 +52,20 @@ To use it from more than one thread, shape on one thread and render the `mt_shap
 `len < 0` means the string is NUL-terminated.
 `color` tints non-color glyphs; color emoji keep their own colors.
 
+## Shaped handle
+
+`mt_render` shapes and rasterizes in one call. To measure then render the same run without shaping twice, or to render into a buffer you own (a glyph or line atlas), hold an `mt_shaped` handle.
+
+| Function | Purpose |
+| --- | --- |
+| `mt_shape(f, utf8, len, color)` | Shape a run once; `color` is baked in. Returns an owned handle. |
+| `mt_shaped_metrics(s)` | Its `mt_metrics`, including the pen origin. |
+| `mt_shaped_size(s, &w, &h)` | The bitmap size `mt_shaped_render` will use. |
+| `mt_shaped_render(s, dst, &w, &h, &m)` | Rasterize; a non-`NULL` `dst` renders into your `w*h*4` buffer, otherwise one is allocated. |
+| `mt_shaped_free(s)` | Release the handle. |
+
+A wrapped line (`mt_block_line`) is an `mt_shaped` too and renders the same way, but the block owns it: never `mt_shaped_free` a line.
+
 ## Rich text and wrapping
 
 `mt_render` takes one font and one color. For mixed styles or multi-line paragraphs, build an `mt_text` from styled runs and lay it out.
@@ -83,6 +97,7 @@ Each line is an `mt_shaped`: stack them by advancing the pen y by each line's `m
 Left, right, and center position the laid-out line in the width; justify stretches it to the width, leaving the last line of each paragraph ragged.
 The Unicode mandatory breaks (UAX #14: LF, VT, FF, CR, CRLF, NEL, LS, PS) start a new line on their own; a blank line keeps the font's height.
 Which OpenType features a tag activates depends on the font (`smcp` needs a font with small caps).
+Not yet supported: text decorations (underline, strikethrough) and tab stops.
 
 ## Layout
 
@@ -109,7 +124,7 @@ A shaped line maps between byte offsets and caret positions, so a consumer can p
 | `mt_shaped_byte_at_x(s, x)` | The nearest insertion byte offset for a pixel x. |
 
 Both work against the shaped line's own text: the whole run for `mt_shape`, or the line's bytes for an `mt_block` line (offsets are line-relative).
-The x is measured from the pen origin, the same axis as `mt_metrics.width`, so add it to the pen x at which the line is drawn.
+The x is the line's own axis from the pen origin, the same axis as `mt_metrics.width`.
 The two round-trip at cluster boundaries, and the UTF-8 byte offsets account for multibyte and astral characters.
 
 ```c
@@ -117,6 +132,11 @@ mt_shaped *s = mt_shape(f, "Click here", -1, ink);
 ptrdiff_t i = mt_shaped_byte_at_x(s, mouse_x - pen_x);  // click -> byte offset
 float caret = pen_x + mt_shaped_caret_x(s, i);          // byte offset -> caret x
 ```
+
+For a wrapped paragraph the x excludes alignment: a line drawn at `pen_x + mt_metrics.align_dx` takes `click_x - pen_x - align_dx` going in and gives `pen_x + align_dx + caret_x` coming out.
+To find which line a click's y fell in, reuse the exact pen-y stacking you draw with (accumulate each line's `mt_metrics.height`, rounded the same way); the library leaves line stacking to you.
+An `mt_block` line's bytes include any trailing hard-break character, so `byte_at_x` can return an offset just past the last glyph; a single `mt_shape` run never carries one.
+Hit-testing returns caret positions, not selection rectangles for a byte range.
 
 ## Backends
 

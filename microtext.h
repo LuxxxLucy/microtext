@@ -137,15 +137,19 @@ unsigned char *mt_shaped_render(const mt_shaped *s, unsigned char *dst,
 void mt_shaped_free(mt_shaped *s);
 
 /* Hit-testing on a shaped line. Both calls work against this line's own text:
- * the whole run for mt_shape, or the line's bytes for an mt_block line. The x
- * is measured from the pen origin (0 at the start pen, growing to
- * mt_metrics.width), the same axis as the advance; add it to the pen x at which
- * the line is drawn.
+ * the whole run for mt_shape, or the line's bytes for an mt_block line. The x is
+ * the line's own axis, measured from its pen origin (0 at the start pen, growing
+ * to mt_metrics.width), the same axis as the advance. It does NOT include
+ * mt_metrics.align_dx: a right/center/justified line is drawn at pen_x +
+ * align_dx, so pass (screen_x - pen_x - align_dx) to mt_shaped_byte_at_x and
+ * draw the caret at pen_x + align_dx + mt_shaped_caret_x(...).
  *
  * mt_shaped_caret_x returns the caret x for a byte offset into the line's text
  * (clamped to the text; the offset should fall on a UTF-8 boundary).
  * mt_shaped_byte_at_x returns the nearest insertion byte offset for a pixel x.
- * They round-trip at cluster boundaries. */
+ * They round-trip at cluster boundaries. An mt_block line's text includes any
+ * trailing mandatory-break character, so its offsets can run one or two bytes
+ * past the last visible glyph; an mt_shape run never carries one. */
 float mt_shaped_caret_x(const mt_shaped *s, ptrdiff_t byte_off);
 ptrdiff_t mt_shaped_byte_at_x(const mt_shaped *s, float x);
 
@@ -179,8 +183,10 @@ int mt_text_run(mt_text *t, const char *utf8, ptrdiff_t len, const mt_font *f,
  * positive wrap width. Left/right/center shift each line via mt_metrics.align_dx;
  * justify stretches the line to the width (last line of a paragraph excepted). */
 void mt_text_align(mt_text *t, mt_align align);
-/* Multiply the baseline-to-baseline distance (mt_metrics.height) of every line;
- * 1.0 or 0 is the font's natural spacing, 1.5 is one-and-a-half spacing. */
+/* Multiply the baseline-to-baseline distance (mt_metrics.height) of every line.
+ * The multiplier is taken literally for any value > 0: 1.5 is one-and-a-half
+ * spacing, and a value below 1.0 tightens leading and may overlap lines. A value
+ * <= 0 means the font's natural spacing. */
 void mt_text_line_height(mt_text *t, float multiple);
 
 void mt_text_free(mt_text *t);
@@ -191,8 +197,9 @@ void mt_text_free(mt_text *t);
  * of zero lines. */
 mt_block *mt_text_wrap(const mt_text *t, float max_width);
 int mt_block_lines(const mt_block *b);
-/* Borrow line i (0-based); owned by the block, valid until mt_block_free. */
-mt_shaped *mt_block_line(const mt_block *b, int i);
+/* Borrow line i (0-based); owned by the block, valid until mt_block_free. The
+ * const return marks the borrow: never pass a block line to mt_shaped_free. */
+const mt_shaped *mt_block_line(const mt_block *b, int i);
 void mt_block_free(mt_block *b);
 
 #ifdef __cplusplus
@@ -390,33 +397,22 @@ struct mt_shaped {
     CFIndex u16_base; /* UTF-16 index of this line's start in its source string */
 };
 
-/* Box a CTLine into mt_shaped, taking ownership of line and copying the line's
- * UTF-8 bytes (u16_base is the line's UTF-16 start in its source string).
- * Derives the ink-sized bitmap and the pen position that lands the ink in it. */
-static mt_shaped *mt_shaped_from_line(CTLineRef line, const char *utf8,
-                                      ptrdiff_t nbytes, CFIndex u16_base)
+/* Box a CTLine into mt_shaped, taking ownership of line and adopting txt (a
+ * malloc'd, NUL-terminated copy of the line's nbytes UTF-8 bytes; u16_base is
+ * the line's UTF-16 start in its source string). Frees both on failure. Derives
+ * the ink-sized bitmap and the pen position that lands the ink inside it. */
+static mt_shaped *mt_shaped_from_line(CTLineRef line, char *txt, int nbytes,
+                                      CFIndex u16_base)
 {
     mt_shaped *s = (mt_shaped *)calloc(1, sizeof(*s));
     if (!s) {
         CFRelease(line);
+        free(txt);
         mt_err = MT_ERR_OOM;
         return NULL;
     }
-    if (nbytes < 0) {
-        nbytes = 0;
-    }
-    s->txt = (char *)malloc((size_t)nbytes + 1);
-    if (!s->txt) {
-        CFRelease(line);
-        free(s);
-        mt_err = MT_ERR_OOM;
-        return NULL;
-    }
-    if (nbytes) {
-        memcpy(s->txt, utf8, (size_t)nbytes);
-    }
-    s->txt[nbytes] = 0;
-    s->nbytes = (int)nbytes;
+    s->txt = txt;
+    s->nbytes = nbytes;
     s->u16_base = u16_base;
     s->line = line;
     CGFloat ascent = 0, descent = 0, leading = 0;
@@ -463,8 +459,16 @@ mt_shaped *mt_shape(const mt_font *f, const char *utf8, ptrdiff_t len,
     if (!line) {
         return NULL;
     }
-    ptrdiff_t n = len < 0 ? (ptrdiff_t)strlen(utf8) : len;
-    return mt_shaped_from_line(line, utf8, n, 0);
+    size_t n = len < 0 ? strlen(utf8) : (size_t)len;
+    char *copy = (char *)malloc(n + 1);
+    if (!copy) {
+        CFRelease(line);
+        mt_err = MT_ERR_OOM;
+        return NULL;
+    }
+    memcpy(copy, utf8, n);
+    copy[n] = 0;
+    return mt_shaped_from_line(line, copy, (int)n, 0);
 }
 
 mt_metrics mt_shaped_metrics(const mt_shaped *s)
@@ -554,6 +558,12 @@ void mt_shaped_free(mt_shaped *s)
     free(s);
 }
 
+/* Byte length of the UTF-8 sequence whose lead byte is c (1..4). */
+static int mt_utf8_seqlen(unsigned char c)
+{
+    return c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+}
+
 /* Count UTF-16 code units in the first byteoff bytes of UTF-8 text t. A 4-byte
  * UTF-8 sequence is an astral codepoint and counts as a surrogate pair (2). */
 static CFIndex mt_u16_count(const char *t, int nbytes, ptrdiff_t byteoff)
@@ -566,8 +576,7 @@ static CFIndex mt_u16_count(const char *t, int nbytes, ptrdiff_t byteoff)
     }
     CFIndex u = 0;
     for (ptrdiff_t i = 0; i < byteoff;) {
-        unsigned char c = (unsigned char)t[i];
-        int len = c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+        int len = mt_utf8_seqlen((unsigned char)t[i]);
         if (i + len > byteoff) {
             break;  /* partial sequence: stop on the boundary */
         }
@@ -583,8 +592,7 @@ static ptrdiff_t mt_u16_to_byte(const char *t, int nbytes, CFIndex u16)
     CFIndex u = 0;
     ptrdiff_t i = 0;
     while (i < nbytes && u < u16) {
-        unsigned char c = (unsigned char)t[i];
-        int len = c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+        int len = mt_utf8_seqlen((unsigned char)t[i]);
         u += len == 4 ? 2 : 1;
         i += len;
     }
@@ -598,8 +606,7 @@ float mt_shaped_caret_x(const mt_shaped *s, ptrdiff_t byte_off)
         return 0.0f;
     }
     CFIndex idx = s->u16_base + mt_u16_count(s->txt, s->nbytes, byte_off);
-    CGFloat secondary = 0;
-    CGFloat x = CTLineGetOffsetForStringIndex(s->line, idx, &secondary);
+    CGFloat x = CTLineGetOffsetForStringIndex(s->line, idx, NULL);
     mt_err = MT_OK;
     return (float)x;
 }
@@ -822,6 +829,28 @@ struct mt_block {
     int n;
 };
 
+/* Encode a UTF-16 range as a malloc'd, NUL-terminated UTF-8 string; out_len
+ * receives the byte length. The caller owns the buffer. Returns NULL on OOM. */
+static char *mt_utf16_slice(const UniChar *u, CFIndex n, CFIndex *out_len)
+{
+    CFStringRef s = CFStringCreateWithCharacters(NULL, u, n);
+    if (!s) {
+        return NULL;
+    }
+    CFIndex blen = 0;
+    CFStringGetBytes(s, CFRangeMake(0, n), kCFStringEncodingUTF8, 0, false, NULL,
+                     0, &blen);
+    char *buf = (char *)malloc((size_t)blen + 1);
+    if (buf) {
+        CFStringGetBytes(s, CFRangeMake(0, n), kCFStringEncodingUTF8, 0, false,
+                         (UInt8 *)buf, blen, NULL);
+        buf[blen] = 0;
+    }
+    CFRelease(s);
+    *out_len = blen;
+    return buf;
+}
+
 /* Length of the mandatory line break (UAX #14) at index i, or 0 if none. CRLF
  * counts as one break of length 2. */
 static int mt_break_len(const UniChar *c, CFIndex i, CFIndex total)
@@ -919,43 +948,26 @@ mt_block *mt_text_wrap(const mt_text *t, float max_width)
             b->lines = nl;
             cap = ncap;
         }
-        /* This line's UTF-8 bytes, for byte<->index queries. */
-        CFStringRef sub =
-            CFStringCreateWithCharacters(NULL, chars + start, end - start);
-        char *slice = NULL;
+        /* This line's UTF-8 bytes, adopted by mt_shaped for byte<->index queries. */
         CFIndex blen = 0;
-        if (sub) {
-            CFStringGetBytes(sub, CFRangeMake(0, end - start),
-                             kCFStringEncodingUTF8, 0, false, NULL, 0, &blen);
-            slice = (char *)malloc((size_t)blen + 1);
-            if (slice) {
-                CFStringGetBytes(sub, CFRangeMake(0, end - start),
-                                 kCFStringEncodingUTF8, 0, false,
-                                 (UInt8 *)slice, blen, NULL);
-                slice[blen] = 0;
-            }
-            CFRelease(sub);
-        }
+        char *slice = mt_utf16_slice(chars + start, end - start, &blen);
         if (!slice) {
             CFRelease(line);
             mt_err = MT_ERR_OOM;
             goto fail;
         }
-        mt_shaped *sh = mt_shaped_from_line(line, slice, blen, start);
-        free(slice);
+        mt_shaped *sh = mt_shaped_from_line(line, slice, (int)blen, start);
         if (!sh) {
-            goto fail;  /* mt_err set; line released by helper */
+            goto fail;  /* mt_err set; line and slice released by helper */
         }
         if (t->line_height > 0) {
             sh->m.height *= t->line_height;
         }
         if (max_width > 0) {
-            float slack = (float)max_width - sh->m.width;
-            if (t->align == MT_ALIGN_RIGHT) {
-                sh->m.align_dx = slack;
-            } else if (t->align == MT_ALIGN_CENTER) {
-                sh->m.align_dx = slack * 0.5f;
-            }
+            float factor = t->align == MT_ALIGN_RIGHT    ? 1.0f
+                           : t->align == MT_ALIGN_CENTER ? 0.5f
+                                                         : 0.0f;
+            sh->m.align_dx = ((float)max_width - sh->m.width) * factor;
         }
         b->lines[b->n++] = sh;
         start = end;
@@ -973,7 +985,7 @@ fail:
 
 int mt_block_lines(const mt_block *b) { return b ? b->n : 0; }
 
-mt_shaped *mt_block_line(const mt_block *b, int i)
+const mt_shaped *mt_block_line(const mt_block *b, int i)
 {
     if (!b || i < 0 || i >= b->n) {
         return NULL;

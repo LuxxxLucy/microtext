@@ -59,7 +59,7 @@ static void composite_block(mt_block *b, const char *path)
     }
     int y = 0;
     for (int i = 0; i < n; i++) {
-        mt_shaped *ln = mt_block_line(b, i);
+        const mt_shaped *ln = mt_block_line(b, i);
         mt_metrics m = mt_shaped_metrics(ln);
         int lw, lh;
         unsigned char *px = mt_shaped_render(ln, NULL, &lw, &lh, NULL);
@@ -286,7 +286,7 @@ int main(void)
         mt_block *bl = mt_text_wrap(t, 360.0f);
         int ok = bl && mt_block_lines(bl) >= 2;
         if (ok) {
-            mt_shaped *ln = mt_block_line(bl, 1);
+            const mt_shaped *ln = mt_block_line(bl, 1);
             if (mt_shaped_byte_at_x(ln, 0.0f) != 0 ||
                 mt_shaped_caret_x(ln, 0) > 1.0f) {
                 ok = 0;
@@ -319,9 +319,12 @@ int main(void)
             mt_metrics r0 = mt_shaped_metrics(mt_block_line(br, 0));
             mt_metrics c0 = mt_shaped_metrics(mt_block_line(bc, 0));
             float expect = wbox - l0.width;
+            /* caret_x is line-relative: ~0 at the start even on a right-aligned
+               line whose align_dx is large (the two axes are independent) */
+            float caret0 = mt_shaped_caret_x(mt_block_line(br, 0), 0);
             ok = l0.align_dx == 0.0f && r0.align_dx > 1.0f &&
                  NEAR(r0.align_dx, expect, 1.0f) &&
-                 NEAR(c0.align_dx, expect * 0.5f, 1.0f);
+                 NEAR(c0.align_dx, expect * 0.5f, 1.0f) && caret0 < 1.0f;
         }
         printf("%s  align L/R/C       dx left=%.0f right=%.0f center=%.0f\n",
                CHECK(ok), mt_shaped_metrics(mt_block_line(bl, 0)).align_dx,

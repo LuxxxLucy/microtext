@@ -21,7 +21,7 @@ static demo_para bake(mt_block *b)
     demo_para p = { 0 };
     int y = 0;
     for (int i = 0; i < mt_block_lines(b) && i < 32; i++) {
-        mt_shaped *ln = mt_block_line(b, i);
+        const mt_shaped *ln = mt_block_line(b, i);
         mt_metrics m = mt_shaped_metrics(ln);
         int w, h;
         unsigned char *px = mt_shaped_render(ln, NULL, &w, &h, NULL);
