@@ -273,6 +273,54 @@ MICROTEXTDEF void mt_block_free(mt_block *b);
 #error "microtext: define all of MICROTEXT_MALLOC, MICROTEXT_REALLOC, MICROTEXT_FREE, or none"
 #endif
 
+/* Backend-neutral UTF-8 / UTF-16 index math, shared by any backend. */
+
+/* Byte length of the UTF-8 sequence whose lead byte is c (1..4). */
+static int mt_utf8_seqlen(unsigned char c)
+{
+    return c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+}
+
+/* Count UTF-16 code units in the first byteoff bytes of UTF-8 text t. A 4-byte
+ * UTF-8 sequence is an astral codepoint and counts as a surrogate pair (2). */
+static ptrdiff_t mt_u16_count(const char *t, int nbytes, ptrdiff_t byteoff)
+{
+    if (byteoff < 0) {
+        byteoff = 0;
+    }
+    if (byteoff > nbytes) {
+        byteoff = nbytes;
+    }
+    ptrdiff_t u = 0;
+    for (ptrdiff_t i = 0; i < byteoff;) {
+        int len = mt_utf8_seqlen((unsigned char)t[i]);
+        if (i + len > byteoff) {
+            break;  /* partial sequence: stop on the boundary */
+        }
+        u += len == 4 ? 2 : 1;
+        i += len;
+    }
+    return u;
+}
+
+/* Inverse: the byte offset reached after u16 UTF-16 code units of t. */
+static ptrdiff_t mt_u16_to_byte(const char *t, int nbytes, ptrdiff_t u16)
+{
+    ptrdiff_t u = 0;
+    ptrdiff_t i = 0;
+    while (i < nbytes && u < u16) {
+        int len = mt_utf8_seqlen((unsigned char)t[i]);
+        u += len == 4 ? 2 : 1;
+        i += len;
+    }
+    return i;
+}
+
+/* A backend implements the platform block below: open/close a font, shape a run
+ * into a CTLine-equivalent, derive ink and typographic bounds (the coordinate
+ * contract in INTERNALS), rasterize into an RGBA buffer, and answer the caret
+ * offset<->x and string-index queries. The wrap loop, the metrics math, and the
+ * helpers above are shared; a new backend fills in only those primitives. */
 #if defined(__APPLE__)
 
 #include <CoreFoundation/CoreFoundation.h>
@@ -632,47 +680,6 @@ MICROTEXTDEF void mt_shaped_free(mt_shaped *s)
     }
     MICROTEXT_FREE(s->txt);
     MICROTEXT_FREE(s);
-}
-
-/* Byte length of the UTF-8 sequence whose lead byte is c (1..4). */
-static int mt_utf8_seqlen(unsigned char c)
-{
-    return c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
-}
-
-/* Count UTF-16 code units in the first byteoff bytes of UTF-8 text t. A 4-byte
- * UTF-8 sequence is an astral codepoint and counts as a surrogate pair (2). */
-static CFIndex mt_u16_count(const char *t, int nbytes, ptrdiff_t byteoff)
-{
-    if (byteoff < 0) {
-        byteoff = 0;
-    }
-    if (byteoff > nbytes) {
-        byteoff = nbytes;
-    }
-    CFIndex u = 0;
-    for (ptrdiff_t i = 0; i < byteoff;) {
-        int len = mt_utf8_seqlen((unsigned char)t[i]);
-        if (i + len > byteoff) {
-            break;  /* partial sequence: stop on the boundary */
-        }
-        u += len == 4 ? 2 : 1;
-        i += len;
-    }
-    return u;
-}
-
-/* Inverse: the byte offset reached after u16 UTF-16 code units of t. */
-static ptrdiff_t mt_u16_to_byte(const char *t, int nbytes, CFIndex u16)
-{
-    CFIndex u = 0;
-    ptrdiff_t i = 0;
-    while (i < nbytes && u < u16) {
-        int len = mt_utf8_seqlen((unsigned char)t[i]);
-        u += len == 4 ? 2 : 1;
-        i += len;
-    }
-    return i;
 }
 
 MICROTEXTDEF float mt_shaped_caret_x(const mt_shaped *s, ptrdiff_t byte_off)
@@ -1190,7 +1197,7 @@ MICROTEXTDEF void mt_block_free(mt_block *b)
 MICROTEXTDEF void mt_free(void *bitmap) { MICROTEXT_FREE(bitmap); }
 
 #else
-#error "microtext: only the macOS (CoreText) backend exists so far"
+#error "microtext: no backend for this platform yet. Only macOS (CoreText) is implemented; Windows (DirectWrite) and Linux (FreeType/HarfBuzz) are planned. See the Backends section of the README."
 #endif
 
 #endif /* MICROTEXT_IMPLEMENTATION_ONCE */
