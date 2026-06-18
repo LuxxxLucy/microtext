@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install raylib
+        run: brew install raylib
+      - name: Build and test
+        run: make all
+      - name: Sanitizers (ASan + UBSan)
+        run: make sanitize
+      - name: Leak check
+        run: make leaks

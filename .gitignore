@@ -1,6 +1,8 @@
 tests/test_dump
+tests/test_dump_san
 examples/demo_1_showcase
 examples/demo_2_raylib
 output/
 *.o
+*.dSYM/
 .DS_Store
