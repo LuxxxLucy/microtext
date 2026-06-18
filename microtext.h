@@ -43,6 +43,18 @@
  *   3: mt_text_align / mt_text_line_height, mt_metrics.align_dx. */
 #define MICROTEXT_VERSION 3
 
+/* Linkage of the public functions, stb-style. The default is external linkage.
+ * Define MICROTEXT_STATIC before including to fold the implementation privately
+ * into one translation unit, or define MICROTEXTDEF yourself for custom linkage
+ * (e.g. __declspec(dllexport) or a visibility attribute). */
+#ifndef MICROTEXTDEF
+#ifdef MICROTEXT_STATIC
+#define MICROTEXTDEF static
+#else
+#define MICROTEXTDEF extern
+#endif
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -84,19 +96,19 @@ typedef enum {
 
 /* The error from the last microtext call. Process-global, not per-thread (see
  * the threading note at the top of the file). */
-mt_error mt_last_error(void);
+MICROTEXTDEF mt_error mt_last_error(void);
 
 /* Open a font by family name at a pixel size. NULL family uses the system UI
  * font. Returns NULL on failure (see mt_last_error). */
-mt_font *mt_font_open(const char *family, float pixel_size);
+MICROTEXTDEF mt_font *mt_font_open(const char *family, float pixel_size);
 /* Same, selecting a bold and/or italic style. A requested style the family
  * lacks falls back to the regular face. */
-mt_font *mt_font_open_styled(const char *family, float pixel_size, int bold,
+MICROTEXTDEF mt_font *mt_font_open_styled(const char *family, float pixel_size, int bold,
                              int italic);
 /* Open a font from an in-memory .ttf/.otf, so an app can ship its own. The
  * bytes are copied; the caller may free them after the call. */
-mt_font *mt_font_open_memory(const void *data, size_t len, float pixel_size);
-void mt_font_close(mt_font *f);
+MICROTEXTDEF mt_font *mt_font_open_memory(const void *data, size_t len, float pixel_size);
+MICROTEXTDEF void mt_font_close(mt_font *f);
 
 /* Both calls lay out exactly one line. Embedded newlines are not breaks; to
  * draw a paragraph, split on '\n' yourself and stack the lines, advancing the
@@ -104,7 +116,7 @@ void mt_font_close(mt_font *f);
  * transparent bitmap with metrics width 0. len < 0 means NUL-terminated. */
 
 /* Measure a UTF-8 run without rendering. origin_x/origin_y are left zero. */
-mt_metrics mt_measure(const mt_font *f, const char *utf8, ptrdiff_t len);
+MICROTEXTDEF mt_metrics mt_measure(const mt_font *f, const char *utf8, ptrdiff_t len);
 
 /* Render a UTF-8 run to a freshly allocated bitmap of 8-bit sRGB RGBA, straight
  * alpha, top row first, sized to the glyph ink. Fills *out_w, *out_h, and
@@ -114,27 +126,27 @@ mt_metrics mt_measure(const mt_font *f, const char *utf8, ptrdiff_t len);
  * The conversion from premultiplied alpha loses color precision at very low
  * alpha. pixel_size is in physical pixels: on a 2x display, open the font at
  * the logical size times the backing scale and draw one texel per pixel. */
-unsigned char *mt_render(const mt_font *f, const char *utf8, ptrdiff_t len,
+MICROTEXTDEF unsigned char *mt_render(const mt_font *f, const char *utf8, ptrdiff_t len,
                          mt_color color, int *out_w, int *out_h,
                          mt_metrics *out_m);
 
-void mt_free(void *bitmap);
+MICROTEXTDEF void mt_free(void *bitmap);
 
 /* A run shaped once and reused, so measuring then rendering the same bytes
  * does not pay the shaping cost twice, and an atlas builder can render into a
  * buffer it owns. color is baked in at shape time. */
 typedef struct mt_shaped mt_shaped;
-mt_shaped *mt_shape(const mt_font *f, const char *utf8, ptrdiff_t len,
+MICROTEXTDEF mt_shaped *mt_shape(const mt_font *f, const char *utf8, ptrdiff_t len,
                     mt_color color);
 /* Metrics including the pen origin and the bitmap size mt_shaped_render uses. */
-mt_metrics mt_shaped_metrics(const mt_shaped *s);
-void mt_shaped_size(const mt_shaped *s, int *w, int *h);
+MICROTEXTDEF mt_metrics mt_shaped_metrics(const mt_shaped *s);
+MICROTEXTDEF void mt_shaped_size(const mt_shaped *s, int *w, int *h);
 /* Render the shaped run. If dst is non-NULL it must hold w*h*4 bytes for the
  * size from mt_shaped_size, with row stride w*4; otherwise a buffer is
  * allocated. Returns the buffer (dst when given) or NULL. */
-unsigned char *mt_shaped_render(const mt_shaped *s, unsigned char *dst,
+MICROTEXTDEF unsigned char *mt_shaped_render(const mt_shaped *s, unsigned char *dst,
                                 int *out_w, int *out_h, mt_metrics *out_m);
-void mt_shaped_free(mt_shaped *s);
+MICROTEXTDEF void mt_shaped_free(mt_shaped *s);
 
 /* Hit-testing on a shaped line. Both calls work against this line's own text:
  * the whole run for mt_shape, or the line's bytes for an mt_block line. The x is
@@ -150,8 +162,8 @@ void mt_shaped_free(mt_shaped *s);
  * They round-trip at cluster boundaries. An mt_block line's text includes any
  * trailing mandatory-break character, so its offsets can run one or two bytes
  * past the last visible glyph; an mt_shape run never carries one. */
-float mt_shaped_caret_x(const mt_shaped *s, ptrdiff_t byte_off);
-ptrdiff_t mt_shaped_byte_at_x(const mt_shaped *s, float x);
+MICROTEXTDEF float mt_shaped_caret_x(const mt_shaped *s, ptrdiff_t byte_off);
+MICROTEXTDEF ptrdiff_t mt_shaped_byte_at_x(const mt_shaped *s, float x);
 
 /* Rich, multi-run text and width-based line wrapping.
  *
@@ -172,35 +184,35 @@ typedef enum {
 } mt_align;
 
 /* Start an empty paragraph. Free with mt_text_free. Returns NULL on OOM. */
-mt_text *mt_text_new(void);
+MICROTEXTDEF mt_text *mt_text_new(void);
 /* Append a styled run. features is a space-separated list of OpenType feature
  * tags to enable (e.g. "smcp tnum frac"), or NULL for none. Returns 0 on
  * success, -1 on failure (see mt_last_error). len < 0 means NUL-terminated. */
-int mt_text_run(mt_text *t, const char *utf8, ptrdiff_t len, const mt_font *f,
+MICROTEXTDEF int mt_text_run(mt_text *t, const char *utf8, ptrdiff_t len, const mt_font *f,
                 mt_color color, const char *features);
 
 /* Paragraph alignment for the whole text; takes effect at wrap time and needs a
  * positive wrap width. Left/right/center shift each line via mt_metrics.align_dx;
  * justify stretches the line to the width (last line of a paragraph excepted). */
-void mt_text_align(mt_text *t, mt_align align);
+MICROTEXTDEF void mt_text_align(mt_text *t, mt_align align);
 /* Multiply the baseline-to-baseline distance (mt_metrics.height) of every line.
  * The multiplier is taken literally for any value > 0: 1.5 is one-and-a-half
  * spacing, and a value below 1.0 tightens leading and may overlap lines. A value
  * <= 0 means the font's natural spacing. */
-void mt_text_line_height(mt_text *t, float multiple);
+MICROTEXTDEF void mt_text_line_height(mt_text *t, float multiple);
 
-void mt_text_free(mt_text *t);
+MICROTEXTDEF void mt_text_free(mt_text *t);
 
 /* Lay the text out: wrap to max_width pixels (<= 0 wraps only at hard breaks)
  * and split at mandatory breaks. Returns a list of lines, each an mt_shaped;
  * free with mt_block_free. Returns NULL on failure; empty text yields a block
  * of zero lines. */
-mt_block *mt_text_wrap(const mt_text *t, float max_width);
-int mt_block_lines(const mt_block *b);
+MICROTEXTDEF mt_block *mt_text_wrap(const mt_text *t, float max_width);
+MICROTEXTDEF int mt_block_lines(const mt_block *b);
 /* Borrow line i (0-based); owned by the block, valid until mt_block_free. The
  * const return marks the borrow: never pass a block line to mt_shaped_free. */
-const mt_shaped *mt_block_line(const mt_block *b, int i);
-void mt_block_free(mt_block *b);
+MICROTEXTDEF const mt_shaped *mt_block_line(const mt_block *b, int i);
+MICROTEXTDEF void mt_block_free(mt_block *b);
 
 #ifdef __cplusplus
 }
@@ -218,6 +230,18 @@ void mt_block_free(mt_block *b);
 #include <stdlib.h>
 #include <string.h>
 
+/* Allocator hooks. Define all three (or none) before including the
+ * implementation to route every internal allocation through your own. */
+#if defined(MICROTEXT_MALLOC) && defined(MICROTEXT_REALLOC) && defined(MICROTEXT_FREE)
+/* the consumer supplied all three */
+#elif !defined(MICROTEXT_MALLOC) && !defined(MICROTEXT_REALLOC) && !defined(MICROTEXT_FREE)
+#define MICROTEXT_MALLOC(sz)     malloc(sz)
+#define MICROTEXT_REALLOC(p, sz) realloc(p, sz)
+#define MICROTEXT_FREE(p)        free(p)
+#else
+#error "microtext: define all of MICROTEXT_MALLOC, MICROTEXT_REALLOC, MICROTEXT_FREE, or none"
+#endif
+
 #if defined(__APPLE__)
 
 #include <CoreFoundation/CoreFoundation.h>
@@ -229,7 +253,7 @@ struct mt_font {
 };
 
 static mt_error mt_err;
-mt_error mt_last_error(void) { return mt_err; }
+MICROTEXTDEF mt_error mt_last_error(void) { return mt_err; }
 
 /* One process-wide sRGB color space for both glyph color and bitmap context,
  * lazily initialized and never released. Unsynchronized, matching the library's
@@ -250,7 +274,7 @@ static mt_font *mt_wrap(CTFontRef ct)
         mt_err = MT_ERR_FONT;
         return NULL;
     }
-    mt_font *f = (mt_font *)calloc(1, sizeof(*f));
+    mt_font *f = (mt_font *)MICROTEXT_MALLOC(sizeof(*f));
     if (!f) {
         CFRelease(ct);
         mt_err = MT_ERR_OOM;
@@ -261,7 +285,7 @@ static mt_font *mt_wrap(CTFontRef ct)
     return f;
 }
 
-mt_font *mt_font_open_styled(const char *family, float pixel_size, int bold,
+MICROTEXTDEF mt_font *mt_font_open_styled(const char *family, float pixel_size, int bold,
                              int italic)
 {
     CTFontRef base = NULL;
@@ -300,12 +324,12 @@ mt_font *mt_font_open_styled(const char *family, float pixel_size, int bold,
     return mt_wrap(base);
 }
 
-mt_font *mt_font_open(const char *family, float pixel_size)
+MICROTEXTDEF mt_font *mt_font_open(const char *family, float pixel_size)
 {
     return mt_font_open_styled(family, pixel_size, 0, 0);
 }
 
-mt_font *mt_font_open_memory(const void *data, size_t len, float pixel_size)
+MICROTEXTDEF mt_font *mt_font_open_memory(const void *data, size_t len, float pixel_size)
 {
     if (!data || !len) {
         mt_err = MT_ERR_FONT;
@@ -327,7 +351,7 @@ mt_font *mt_font_open_memory(const void *data, size_t len, float pixel_size)
     return mt_wrap(ct);
 }
 
-void mt_font_close(mt_font *f)
+MICROTEXTDEF void mt_font_close(mt_font *f)
 {
     if (!f) {
         return;
@@ -335,7 +359,7 @@ void mt_font_close(mt_font *f)
     if (f->ct) {
         CFRelease(f->ct);
     }
-    free(f);
+    MICROTEXT_FREE(f);
 }
 
 /* Build a shaped line; CoreText applies bidi, fallback, and color glyphs.
@@ -385,7 +409,7 @@ static CTLineRef mt_line(const mt_font *f, const char *utf8, ptrdiff_t len,
     return line;
 }
 
-#define MT_BLEED 1.0
+#define MICROTEXT_BLEED 1.0
 
 struct mt_shaped {
     CTLineRef line;
@@ -404,13 +428,14 @@ struct mt_shaped {
 static mt_shaped *mt_shaped_from_line(CTLineRef line, char *txt, int nbytes,
                                       CFIndex u16_base)
 {
-    mt_shaped *s = (mt_shaped *)calloc(1, sizeof(*s));
+    mt_shaped *s = (mt_shaped *)MICROTEXT_MALLOC(sizeof(*s));
     if (!s) {
         CFRelease(line);
-        free(txt);
+        MICROTEXT_FREE(txt);
         mt_err = MT_ERR_OOM;
         return NULL;
     }
+    memset(s, 0, sizeof(*s));
     s->txt = txt;
     s->nbytes = nbytes;
     s->u16_base = u16_base;
@@ -423,15 +448,15 @@ static mt_shaped *mt_shaped_from_line(CTLineRef line, char *txt, int nbytes,
     CGRect ink = CTLineGetImageBounds(line, NULL);
     double x0, y0, x1, y1;
     if (CGRectIsNull(ink) || CGRectIsEmpty(ink)) {
-        x0 = -MT_BLEED;
-        y0 = -descent - MT_BLEED;
-        x1 = advance + MT_BLEED;
-        y1 = ascent + MT_BLEED;
+        x0 = -MICROTEXT_BLEED;
+        y0 = -descent - MICROTEXT_BLEED;
+        x1 = advance + MICROTEXT_BLEED;
+        y1 = ascent + MICROTEXT_BLEED;
     } else {
-        x0 = floor(ink.origin.x - MT_BLEED);
-        y0 = floor(ink.origin.y - MT_BLEED);
-        x1 = ceil(ink.origin.x + ink.size.width + MT_BLEED);
-        y1 = ceil(ink.origin.y + ink.size.height + MT_BLEED);
+        x0 = floor(ink.origin.x - MICROTEXT_BLEED);
+        y0 = floor(ink.origin.y - MICROTEXT_BLEED);
+        x1 = ceil(ink.origin.x + ink.size.width + MICROTEXT_BLEED);
+        y1 = ceil(ink.origin.y + ink.size.height + MICROTEXT_BLEED);
     }
     s->w = (int)(x1 - x0) < 1 ? 1 : (int)(x1 - x0);
     s->h = (int)(y1 - y0) < 1 ? 1 : (int)(y1 - y0);
@@ -448,7 +473,7 @@ static mt_shaped *mt_shaped_from_line(CTLineRef line, char *txt, int nbytes,
     return s;
 }
 
-mt_shaped *mt_shape(const mt_font *f, const char *utf8, ptrdiff_t len,
+MICROTEXTDEF mt_shaped *mt_shape(const mt_font *f, const char *utf8, ptrdiff_t len,
                     mt_color color)
 {
     if (!f) {
@@ -460,7 +485,7 @@ mt_shaped *mt_shape(const mt_font *f, const char *utf8, ptrdiff_t len,
         return NULL;
     }
     size_t n = len < 0 ? strlen(utf8) : (size_t)len;
-    char *copy = (char *)malloc(n + 1);
+    char *copy = (char *)MICROTEXT_MALLOC(n + 1);
     if (!copy) {
         CFRelease(line);
         mt_err = MT_ERR_OOM;
@@ -471,7 +496,7 @@ mt_shaped *mt_shape(const mt_font *f, const char *utf8, ptrdiff_t len,
     return mt_shaped_from_line(line, copy, (int)n, 0);
 }
 
-mt_metrics mt_shaped_metrics(const mt_shaped *s)
+MICROTEXTDEF mt_metrics mt_shaped_metrics(const mt_shaped *s)
 {
     if (s) {
         return s->m;
@@ -481,7 +506,7 @@ mt_metrics mt_shaped_metrics(const mt_shaped *s)
     return m;
 }
 
-void mt_shaped_size(const mt_shaped *s, int *w, int *h)
+MICROTEXTDEF void mt_shaped_size(const mt_shaped *s, int *w, int *h)
 {
     if (w) {
         *w = s ? s->w : 0;
@@ -491,7 +516,7 @@ void mt_shaped_size(const mt_shaped *s, int *w, int *h)
     }
 }
 
-unsigned char *mt_shaped_render(const mt_shaped *s, unsigned char *dst,
+MICROTEXTDEF unsigned char *mt_shaped_render(const mt_shaped *s, unsigned char *dst,
                                 int *out_w, int *out_h, mt_metrics *out_m)
 {
     if (!s) {
@@ -503,18 +528,19 @@ unsigned char *mt_shaped_render(const mt_shaped *s, unsigned char *dst,
     if (buf) {
         memset(buf, 0, (size_t)w * h * 4);
     } else {
-        buf = (unsigned char *)calloc((size_t)w * h, 4);
+        buf = (unsigned char *)MICROTEXT_MALLOC((size_t)w * h * 4);
         if (!buf) {
             mt_err = MT_ERR_OOM;
             return NULL;
         }
+        memset(buf, 0, (size_t)w * h * 4);
     }
     CGContextRef ctx = CGBitmapContextCreate(buf, w, h, 8, (size_t)w * 4,
                                              mt_srgb(),
                                              kCGImageAlphaPremultipliedLast);
     if (!ctx) {
         if (!dst) {
-            free(buf);
+            MICROTEXT_FREE(buf);
         }
         mt_err = MT_ERR_BACKEND;
         return NULL;
@@ -546,7 +572,7 @@ unsigned char *mt_shaped_render(const mt_shaped *s, unsigned char *dst,
     return buf;
 }
 
-void mt_shaped_free(mt_shaped *s)
+MICROTEXTDEF void mt_shaped_free(mt_shaped *s)
 {
     if (!s) {
         return;
@@ -554,8 +580,8 @@ void mt_shaped_free(mt_shaped *s)
     if (s->line) {
         CFRelease(s->line);
     }
-    free(s->txt);
-    free(s);
+    MICROTEXT_FREE(s->txt);
+    MICROTEXT_FREE(s);
 }
 
 /* Byte length of the UTF-8 sequence whose lead byte is c (1..4). */
@@ -599,7 +625,7 @@ static ptrdiff_t mt_u16_to_byte(const char *t, int nbytes, CFIndex u16)
     return i;
 }
 
-float mt_shaped_caret_x(const mt_shaped *s, ptrdiff_t byte_off)
+MICROTEXTDEF float mt_shaped_caret_x(const mt_shaped *s, ptrdiff_t byte_off)
 {
     if (!s) {
         mt_err = MT_ERR_FONT;
@@ -611,7 +637,7 @@ float mt_shaped_caret_x(const mt_shaped *s, ptrdiff_t byte_off)
     return (float)x;
 }
 
-ptrdiff_t mt_shaped_byte_at_x(const mt_shaped *s, float x)
+MICROTEXTDEF ptrdiff_t mt_shaped_byte_at_x(const mt_shaped *s, float x)
 {
     if (!s) {
         mt_err = MT_ERR_FONT;
@@ -627,7 +653,7 @@ ptrdiff_t mt_shaped_byte_at_x(const mt_shaped *s, float x)
     return mt_u16_to_byte(s->txt, s->nbytes, rel);
 }
 
-mt_metrics mt_measure(const mt_font *f, const char *utf8, ptrdiff_t len)
+MICROTEXTDEF mt_metrics mt_measure(const mt_font *f, const char *utf8, ptrdiff_t len)
 {
     mt_color black = { 0, 0, 0, 255 };
     mt_shaped *s = mt_shape(f, utf8, len, black);
@@ -644,7 +670,7 @@ mt_metrics mt_measure(const mt_font *f, const char *utf8, ptrdiff_t len)
     return m;
 }
 
-unsigned char *mt_render(const mt_font *f, const char *utf8, ptrdiff_t len,
+MICROTEXTDEF unsigned char *mt_render(const mt_font *f, const char *utf8, ptrdiff_t len,
                          mt_color color, int *out_w, int *out_h,
                          mt_metrics *out_m)
 {
@@ -731,16 +757,17 @@ struct mt_text {
     float line_height;  /* 0 = the font's natural spacing */
 };
 
-mt_text *mt_text_new(void)
+MICROTEXTDEF mt_text *mt_text_new(void)
 {
-    mt_text *t = (mt_text *)calloc(1, sizeof(*t));
+    mt_text *t = (mt_text *)MICROTEXT_MALLOC(sizeof(*t));
     if (!t) {
         mt_err = MT_ERR_OOM;
         return NULL;
     }
+    memset(t, 0, sizeof(*t));
     t->as = CFAttributedStringCreateMutable(NULL, 0);
     if (!t->as) {
-        free(t);
+        MICROTEXT_FREE(t);
         mt_err = MT_ERR_OOM;
         return NULL;
     }
@@ -748,7 +775,7 @@ mt_text *mt_text_new(void)
     return t;
 }
 
-int mt_text_run(mt_text *t, const char *utf8, ptrdiff_t len, const mt_font *f,
+MICROTEXTDEF int mt_text_run(mt_text *t, const char *utf8, ptrdiff_t len, const mt_font *f,
                 mt_color color, const char *features)
 {
     if (!t || !f) {
@@ -799,21 +826,21 @@ int mt_text_run(mt_text *t, const char *utf8, ptrdiff_t len, const mt_font *f,
     return rc;
 }
 
-void mt_text_align(mt_text *t, mt_align align)
+MICROTEXTDEF void mt_text_align(mt_text *t, mt_align align)
 {
     if (t) {
         t->align = align;
     }
 }
 
-void mt_text_line_height(mt_text *t, float multiple)
+MICROTEXTDEF void mt_text_line_height(mt_text *t, float multiple)
 {
     if (t) {
         t->line_height = multiple;
     }
 }
 
-void mt_text_free(mt_text *t)
+MICROTEXTDEF void mt_text_free(mt_text *t)
 {
     if (!t) {
         return;
@@ -821,7 +848,7 @@ void mt_text_free(mt_text *t)
     if (t->as) {
         CFRelease(t->as);
     }
-    free(t);
+    MICROTEXT_FREE(t);
 }
 
 struct mt_block {
@@ -840,7 +867,7 @@ static char *mt_utf16_slice(const UniChar *u, CFIndex n, CFIndex *out_len)
     CFIndex blen = 0;
     CFStringGetBytes(s, CFRangeMake(0, n), kCFStringEncodingUTF8, 0, false, NULL,
                      0, &blen);
-    char *buf = (char *)malloc((size_t)blen + 1);
+    char *buf = (char *)MICROTEXT_MALLOC((size_t)blen + 1);
     if (buf) {
         CFStringGetBytes(s, CFRangeMake(0, n), kCFStringEncodingUTF8, 0, false,
                          (UInt8 *)buf, blen, NULL);
@@ -866,17 +893,18 @@ static int mt_break_len(const UniChar *c, CFIndex i, CFIndex total)
     return 0;
 }
 
-mt_block *mt_text_wrap(const mt_text *t, float max_width)
+MICROTEXTDEF mt_block *mt_text_wrap(const mt_text *t, float max_width)
 {
     if (!t) {
         mt_err = MT_ERR_TEXT;
         return NULL;
     }
-    mt_block *b = (mt_block *)calloc(1, sizeof(*b));
+    mt_block *b = (mt_block *)MICROTEXT_MALLOC(sizeof(*b));
     if (!b) {
         mt_err = MT_ERR_OOM;
         return NULL;
     }
+    memset(b, 0, sizeof(*b));
     CFIndex total = CFAttributedStringGetLength(t->as);
     if (total == 0) {
         mt_err = MT_OK;
@@ -884,15 +912,15 @@ mt_block *mt_text_wrap(const mt_text *t, float max_width)
     }
     CTTypesetterRef ts = CTTypesetterCreateWithAttributedString(t->as);
     if (!ts) {
-        free(b);
+        MICROTEXT_FREE(b);
         mt_err = MT_ERR_BACKEND;
         return NULL;
     }
     CFStringRef str = CFAttributedStringGetString(t->as);
-    UniChar *chars = (UniChar *)malloc((size_t)total * sizeof(UniChar));
+    UniChar *chars = (UniChar *)MICROTEXT_MALLOC((size_t)total * sizeof(UniChar));
     if (!chars) {
         CFRelease(ts);
-        free(b);
+        MICROTEXT_FREE(b);
         mt_err = MT_ERR_OOM;
         return NULL;
     }
@@ -938,7 +966,7 @@ mt_block *mt_text_wrap(const mt_text *t, float max_width)
         }
         if (b->n == cap) {
             int ncap = cap ? cap * 2 : 8;
-            mt_shaped **nl = (mt_shaped **)realloc(
+            mt_shaped **nl = (mt_shaped **)MICROTEXT_REALLOC(
                 b->lines, (size_t)ncap * sizeof(*nl));
             if (!nl) {
                 CFRelease(line);
@@ -972,20 +1000,20 @@ mt_block *mt_text_wrap(const mt_text *t, float max_width)
         b->lines[b->n++] = sh;
         start = end;
     }
-    free(chars);
+    MICROTEXT_FREE(chars);
     CFRelease(ts);
     mt_err = MT_OK;
     return b;
 fail:
-    free(chars);
+    MICROTEXT_FREE(chars);
     CFRelease(ts);
     mt_block_free(b);
     return NULL;
 }
 
-int mt_block_lines(const mt_block *b) { return b ? b->n : 0; }
+MICROTEXTDEF int mt_block_lines(const mt_block *b) { return b ? b->n : 0; }
 
-const mt_shaped *mt_block_line(const mt_block *b, int i)
+MICROTEXTDEF const mt_shaped *mt_block_line(const mt_block *b, int i)
 {
     if (!b || i < 0 || i >= b->n) {
         return NULL;
@@ -993,7 +1021,7 @@ const mt_shaped *mt_block_line(const mt_block *b, int i)
     return b->lines[i];
 }
 
-void mt_block_free(mt_block *b)
+MICROTEXTDEF void mt_block_free(mt_block *b)
 {
     if (!b) {
         return;
@@ -1001,11 +1029,11 @@ void mt_block_free(mt_block *b)
     for (int i = 0; i < b->n; i++) {
         mt_shaped_free(b->lines[i]);
     }
-    free(b->lines);
-    free(b);
+    MICROTEXT_FREE(b->lines);
+    MICROTEXT_FREE(b);
 }
 
-void mt_free(void *bitmap) { free(bitmap); }
+MICROTEXTDEF void mt_free(void *bitmap) { MICROTEXT_FREE(bitmap); }
 
 #else
 #error "microtext: only the macOS (CoreText) backend exists so far"
