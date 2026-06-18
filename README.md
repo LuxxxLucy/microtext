@@ -1,8 +1,17 @@
 # microtext
 
+[![CI](https://github.com/LuxxxLucy/microtext/actions/workflows/ci.yml/badge.svg)](https://github.com/LuxxxLucy/microtext/actions/workflows/ci.yml)
+![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+![platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)
+![C99](https://img.shields.io/badge/C-99-blue.svg)
+![single-header](https://img.shields.io/badge/single--header-yes-brightgreen.svg)
+
 A single-header C library for modern text: one UTF-8 string in, one laid-out RGBA bitmap out.
 Bidi, complex shaping, CJK, color emoji, and font fallback come from the operating system's own text engine, so the result looks the way native apps look.
 The core returns pixels and knows nothing about any GPU or window toolkit; upload the bitmap however you like.
+macOS only today (CoreText); Windows and Linux backends are planned, see [Backends](#backends).
+
+Vendor it: drop the single `microtext.h` into your tree and `#define MICROTEXT_IMPLEMENTATION` in exactly one .c file. No build step, no submodule.
 
 This is `stb_truetype.h`'s ergonomics with the OS's typography.
 `stb_truetype` reimplements TrueType in portable C and is therefore monochrome, single-font, and unshaped.
@@ -28,6 +37,15 @@ unsigned char *rgba = mt_render(f, "Hello 你好 \U0001F3B5", -1,
 mt_free(rgba);
 mt_font_close(f);
 ```
+
+Compile it with the three frameworks (no Objective-C, no other dependency):
+
+```sh
+clang -std=c99 yourfile.c -o yourapp \
+    -framework CoreText -framework CoreGraphics -framework CoreFoundation
+```
+
+Put `#define MICROTEXT_IMPLEMENTATION` in exactly one `.c` file before the include; include `microtext.h` plainly everywhere else.
 
 The library is stateless: every `mt_render` allocates a buffer you own and free.
 Caching belongs to the consumer.
@@ -153,6 +171,8 @@ Each backend sits behind the same `mt_*` API; the other two are stubbed with a c
 
 ```sh
 make test             # render sample runs to output/ and check them (exits non-zero on failure)
+make sanitize         # build and run the test under AddressSanitizer + UBSan
+make leaks            # run the test under the macOS leaks tool
 make demo_1_showcase  # render every feature to output/showcase.png (no dependencies)
 make demo_2_raylib    # the interactive raylib demo (needs brew raylib)
 ```
@@ -160,6 +180,16 @@ make demo_2_raylib    # the interactive raylib demo (needs brew raylib)
 Two demos render the same features through two integration paths.
 `examples/demo_1_showcase.c` is headless: it composites every feature onto one bitmap with `mt_render` and `mt_text_wrap` and writes the PNG shown above, so it builds and runs with no dependency beyond the macOS frameworks.
 `examples/demo_2_raylib.c` is the live path: it uploads each `mt_render` result to a `Texture2D` through the cache in `examples/mt_raylib.h` and draws it per frame.
+
+## Configuration
+
+Optional macros, defined before the implementation include:
+
+| Macro | Effect |
+| --- | --- |
+| `MICROTEXT_STATIC` | Give the API internal linkage, folding the implementation privately into the one translation unit that defines `MICROTEXT_IMPLEMENTATION`. |
+| `MICROTEXTDEF` | Override the linkage of every public function (e.g. `__declspec(dllexport)` or a visibility attribute). |
+| `MICROTEXT_MALLOC` / `MICROTEXT_REALLOC` / `MICROTEXT_FREE` | Route every internal allocation through your own allocator. Define all three, or none. |
 
 ## License
 
