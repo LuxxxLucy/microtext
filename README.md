@@ -10,7 +10,7 @@ A single-header C library for modern text: one UTF-8 string in, one laid-out RGB
 Bidi, complex shaping, CJK, color emoji, and font fallback come from the operating system's own text engine, so it looks the way native apps look.
 It returns pixels and knows nothing about any GPU or window toolkit; upload the bitmap however you like.
 It is `stb_truetype.h`'s ergonomics with the OS's typography, so it gains shaping, fallback, bidi, and color emoji a from-scratch rasterizer cannot reach.
-macOS only today (CoreText); Windows and Linux backends are planned, see [Backends](#backends).
+macOS only (CoreText); Windows and Linux backends are planned, see [Backends](#backends).
 
 Vendor it: drop `microtext.h` into your tree and `#define MICROTEXT_IMPLEMENTATION` in exactly one `.c` file. No build step, no submodule.
 
@@ -136,7 +136,7 @@ An `mt_block` line's bytes include any trailing hard-break character; a single `
 | `mt_metrics` | `width`, `height`, `ascent`, `descent`, `leading` (float); `origin_x`, `origin_y` (int pen origin); `align_dx` (float alignment shift). |
 | `mt_align` | `MT_ALIGN_LEFT`, `MT_ALIGN_RIGHT`, `MT_ALIGN_CENTER`, `MT_ALIGN_JUSTIFY`. |
 | `mt_error` | `MT_OK`, `MT_ERR_FONT`, `MT_ERR_TEXT`, `MT_ERR_OOM`, `MT_ERR_BACKEND`. |
-| `MICROTEXT_VERSION` | Monotonic feature level (currently 4); the surface only grows. |
+| `MICROTEXT_VERSION` | Compile-time feature level, for `#if MICROTEXT_VERSION >= N` checks. |
 
 ## Scope and non-goals
 

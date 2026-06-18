@@ -35,14 +35,9 @@
 
 #include <stddef.h>  /* ptrdiff_t */
 
-/* Monotonic feature level, bumped on every change to the public surface. The
- * surface only grows: new functions and appended struct fields, never a
- * signature change, so a higher value is a strict superset of a lower one.
- *   1: initial surface.
- *   2: mt_shaped_caret_x / mt_shaped_byte_at_x hit-testing.
- *   3: mt_text_align / mt_text_line_height, mt_metrics.align_dx.
- *   4: mt_font_metrics; mt_shaped_selection; mt_block_line_y /
- *      mt_block_height / mt_block_line_at_y / mt_block_line_source. */
+/* Compile-time feature level, for `#if MICROTEXT_VERSION >= N` checks. The public
+ * surface only grows: new functions and appended struct fields, never a signature
+ * change, so a higher value is a strict superset of a lower one. */
 #define MICROTEXT_VERSION 4
 
 /* Linkage of the public functions, stb-style. The default is external linkage.
