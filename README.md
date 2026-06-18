@@ -96,6 +96,25 @@ The output is 8-bit sRGB RGBA with straight alpha; the premultiplied-to-straight
 
 On failure the call returns `NULL` (or a zeroed `mt_metrics`) and sets `mt_last_error`, which separates a bad font, invalid UTF-8, out of memory, and a backend refusal.
 
+## Hit-testing
+
+A shaped line maps between byte offsets and caret positions, so a consumer can place a cursor and turn a click into a text offset.
+
+| Function | Purpose |
+| --- | --- |
+| `mt_shaped_caret_x(s, byte_off)` | The caret x for a byte offset into the line's text. |
+| `mt_shaped_byte_at_x(s, x)` | The nearest insertion byte offset for a pixel x. |
+
+Both work against the shaped line's own text: the whole run for `mt_shape`, or the line's bytes for an `mt_block` line (offsets are line-relative).
+The x is measured from the pen origin, the same axis as `mt_metrics.width`, so add it to the pen x at which the line is drawn.
+The two round-trip at cluster boundaries, and the UTF-8 byte offsets account for multibyte and astral characters.
+
+```c
+mt_shaped *s = mt_shape(f, "Click here", -1, ink);
+ptrdiff_t i = mt_shaped_byte_at_x(s, mouse_x - pen_x);  // click -> byte offset
+float caret = pen_x + mt_shaped_caret_x(s, i);          // byte offset -> caret x
+```
+
 ## Backends
 
 | Platform | Engine | Status |

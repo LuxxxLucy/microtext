@@ -37,8 +37,10 @@
 
 /* Monotonic feature level, bumped on every change to the public surface. The
  * surface only grows: new functions and appended struct fields, never a
- * signature change, so a higher value is a strict superset of a lower one. */
-#define MICROTEXT_VERSION 1
+ * signature change, so a higher value is a strict superset of a lower one.
+ *   1: initial surface.
+ *   2: mt_shaped_caret_x / mt_shaped_byte_at_x hit-testing. */
+#define MICROTEXT_VERSION 2
 
 #ifdef __cplusplus
 extern "C" {
@@ -127,6 +129,19 @@ void mt_shaped_size(const mt_shaped *s, int *w, int *h);
 unsigned char *mt_shaped_render(const mt_shaped *s, unsigned char *dst,
                                 int *out_w, int *out_h, mt_metrics *out_m);
 void mt_shaped_free(mt_shaped *s);
+
+/* Hit-testing on a shaped line. Both calls work against this line's own text:
+ * the whole run for mt_shape, or the line's bytes for an mt_block line. The x
+ * is measured from the pen origin (0 at the start pen, growing to
+ * mt_metrics.width), the same axis as the advance; add it to the pen x at which
+ * the line is drawn.
+ *
+ * mt_shaped_caret_x returns the caret x for a byte offset into the line's text
+ * (clamped to the text; the offset should fall on a UTF-8 boundary).
+ * mt_shaped_byte_at_x returns the nearest insertion byte offset for a pixel x.
+ * They round-trip at cluster boundaries. */
+float mt_shaped_caret_x(const mt_shaped *s, ptrdiff_t byte_off);
+ptrdiff_t mt_shaped_byte_at_x(const mt_shaped *s, float x);
 
 /* Rich, multi-run text and width-based line wrapping.
  *
@@ -348,11 +363,16 @@ struct mt_shaped {
     mt_metrics m;     /* origin filled; m.width is the advance */
     int w, h;         /* bitmap size */
     double pen_x, pen_y;  /* text position that lands the ink in the bitmap */
+    char *txt;        /* this line's UTF-8 bytes, for byte<->index queries */
+    int nbytes;
+    CFIndex u16_base; /* UTF-16 index of this line's start in its source string */
 };
 
-/* Box a CTLine into mt_shaped, taking ownership of line. Derives the ink-sized
- * bitmap and the pen position that lands the ink inside it. */
-static mt_shaped *mt_shaped_from_line(CTLineRef line)
+/* Box a CTLine into mt_shaped, taking ownership of line and copying the line's
+ * UTF-8 bytes (u16_base is the line's UTF-16 start in its source string).
+ * Derives the ink-sized bitmap and the pen position that lands the ink in it. */
+static mt_shaped *mt_shaped_from_line(CTLineRef line, const char *utf8,
+                                      ptrdiff_t nbytes, CFIndex u16_base)
 {
     mt_shaped *s = (mt_shaped *)calloc(1, sizeof(*s));
     if (!s) {
@@ -360,6 +380,22 @@ static mt_shaped *mt_shaped_from_line(CTLineRef line)
         mt_err = MT_ERR_OOM;
         return NULL;
     }
+    if (nbytes < 0) {
+        nbytes = 0;
+    }
+    s->txt = (char *)malloc((size_t)nbytes + 1);
+    if (!s->txt) {
+        CFRelease(line);
+        free(s);
+        mt_err = MT_ERR_OOM;
+        return NULL;
+    }
+    if (nbytes) {
+        memcpy(s->txt, utf8, (size_t)nbytes);
+    }
+    s->txt[nbytes] = 0;
+    s->nbytes = (int)nbytes;
+    s->u16_base = u16_base;
     s->line = line;
     CGFloat ascent = 0, descent = 0, leading = 0;
     double advance = CTLineGetTypographicBounds(line, &ascent, &descent,
@@ -405,7 +441,8 @@ mt_shaped *mt_shape(const mt_font *f, const char *utf8, ptrdiff_t len,
     if (!line) {
         return NULL;
     }
-    return mt_shaped_from_line(line);
+    ptrdiff_t n = len < 0 ? (ptrdiff_t)strlen(utf8) : len;
+    return mt_shaped_from_line(line, utf8, n, 0);
 }
 
 mt_metrics mt_shaped_metrics(const mt_shaped *s)
@@ -491,7 +528,74 @@ void mt_shaped_free(mt_shaped *s)
     if (s->line) {
         CFRelease(s->line);
     }
+    free(s->txt);
     free(s);
+}
+
+/* Count UTF-16 code units in the first byteoff bytes of UTF-8 text t. A 4-byte
+ * UTF-8 sequence is an astral codepoint and counts as a surrogate pair (2). */
+static CFIndex mt_u16_count(const char *t, int nbytes, ptrdiff_t byteoff)
+{
+    if (byteoff < 0) {
+        byteoff = 0;
+    }
+    if (byteoff > nbytes) {
+        byteoff = nbytes;
+    }
+    CFIndex u = 0;
+    for (ptrdiff_t i = 0; i < byteoff;) {
+        unsigned char c = (unsigned char)t[i];
+        int len = c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+        if (i + len > byteoff) {
+            break;  /* partial sequence: stop on the boundary */
+        }
+        u += len == 4 ? 2 : 1;
+        i += len;
+    }
+    return u;
+}
+
+/* Inverse: the byte offset reached after u16 UTF-16 code units of t. */
+static ptrdiff_t mt_u16_to_byte(const char *t, int nbytes, CFIndex u16)
+{
+    CFIndex u = 0;
+    ptrdiff_t i = 0;
+    while (i < nbytes && u < u16) {
+        unsigned char c = (unsigned char)t[i];
+        int len = c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+        u += len == 4 ? 2 : 1;
+        i += len;
+    }
+    return i;
+}
+
+float mt_shaped_caret_x(const mt_shaped *s, ptrdiff_t byte_off)
+{
+    if (!s) {
+        mt_err = MT_ERR_FONT;
+        return 0.0f;
+    }
+    CFIndex idx = s->u16_base + mt_u16_count(s->txt, s->nbytes, byte_off);
+    CGFloat secondary = 0;
+    CGFloat x = CTLineGetOffsetForStringIndex(s->line, idx, &secondary);
+    mt_err = MT_OK;
+    return (float)x;
+}
+
+ptrdiff_t mt_shaped_byte_at_x(const mt_shaped *s, float x)
+{
+    if (!s) {
+        mt_err = MT_ERR_FONT;
+        return 0;
+    }
+    CFIndex idx =
+        CTLineGetStringIndexForPosition(s->line, CGPointMake((CGFloat)x, 0));
+    CFIndex rel = idx == kCFNotFound ? 0 : idx - s->u16_base;
+    if (rel < 0) {
+        rel = 0;
+    }
+    mt_err = MT_OK;
+    return mt_u16_to_byte(s->txt, s->nbytes, rel);
 }
 
 mt_metrics mt_measure(const mt_font *f, const char *utf8, ptrdiff_t len)
@@ -767,7 +871,30 @@ mt_block *mt_text_wrap(const mt_text *t, float max_width)
             b->lines = nl;
             cap = ncap;
         }
-        mt_shaped *sh = mt_shaped_from_line(line);  /* takes ownership */
+        /* This line's UTF-8 bytes, for byte<->index queries. */
+        CFStringRef sub =
+            CFStringCreateWithCharacters(NULL, chars + start, end - start);
+        char *slice = NULL;
+        CFIndex blen = 0;
+        if (sub) {
+            CFStringGetBytes(sub, CFRangeMake(0, end - start),
+                             kCFStringEncodingUTF8, 0, false, NULL, 0, &blen);
+            slice = (char *)malloc((size_t)blen + 1);
+            if (slice) {
+                CFStringGetBytes(sub, CFRangeMake(0, end - start),
+                                 kCFStringEncodingUTF8, 0, false,
+                                 (UInt8 *)slice, blen, NULL);
+                slice[blen] = 0;
+            }
+            CFRelease(sub);
+        }
+        if (!slice) {
+            CFRelease(line);
+            mt_err = MT_ERR_OOM;
+            goto fail;
+        }
+        mt_shaped *sh = mt_shaped_from_line(line, slice, blen, start);
+        free(slice);
         if (!sh) {
             goto fail;  /* mt_err set; line released by helper */
         }

@@ -242,6 +242,60 @@ int main(void)
         mt_font_close(bk);
     }
 
+    /* hit-testing: byte offset <-> caret x round-trips on a shaped line */
+    {
+        mt_shaped *s = mt_shape(f, "Hello", -1, ink);
+        int ok = s != NULL;
+        if (s) {
+            float wd = mt_shaped_metrics(s).width;
+            ok = mt_shaped_caret_x(s, 0) < 1.0f &&
+                 mt_shaped_caret_x(s, 5) > wd - 2.0f;
+            for (int i = 0; i <= 5; i++) {
+                if (mt_shaped_byte_at_x(s, mt_shaped_caret_x(s, i)) != i) {
+                    ok = 0;
+                }
+            }
+            mt_shaped_free(s);
+        }
+        printf("%s  hit-test ascii    round-trip bytes 0..5\n", CHECK(ok));
+    }
+    {
+        /* "A" + U+00E9 (2 bytes, 1 u16) + U+1F600 (4 bytes, 2 u16) + "B" */
+        const char *txt = "Aé\U0001F600B";
+        ptrdiff_t bound[] = { 0, 1, 3, 7, 8 };
+        mt_shaped *s = mt_shape(f, txt, -1, ink);
+        int ok = s != NULL;
+        if (s) {
+            for (int i = 0; i < 5; i++) {
+                if (mt_shaped_byte_at_x(s, mt_shaped_caret_x(s, bound[i])) !=
+                    bound[i]) {
+                    ok = 0;
+                }
+            }
+            mt_shaped_free(s);
+        }
+        printf("%s  hit-test unicode  multibyte + astral round-trip\n",
+               CHECK(ok));
+    }
+    {
+        /* block lines carry line-relative offsets */
+        mt_text *t = mt_text_new();
+        mt_text_run(t, "alpha beta gamma delta epsilon zeta eta theta", -1, f,
+                    ink, NULL);
+        mt_block *bl = mt_text_wrap(t, 360.0f);
+        int ok = bl && mt_block_lines(bl) >= 2;
+        if (ok) {
+            mt_shaped *ln = mt_block_line(bl, 1);
+            if (mt_shaped_byte_at_x(ln, 0.0f) != 0 ||
+                mt_shaped_caret_x(ln, 0) > 1.0f) {
+                ok = 0;
+            }
+        }
+        printf("%s  hit-test block    line-relative offsets\n", CHECK(ok));
+        mt_block_free(bl);
+        mt_text_free(t);
+    }
+
     /* error channel */
     int w, h;
     int pass = 1;
