@@ -128,6 +128,24 @@ The x axis is the line's own and excludes `mt_metrics.align_dx`: a line drawn at
 For the y axis of a wrapped block, `mt_block_line_at_y` finds the line and `mt_block_line_source` maps a line offset back to a document byte.
 An `mt_block` line's bytes include any trailing hard-break character; a single `mt_shape` run never carries one.
 
+## Types
+
+| Type | Definition |
+| --- | --- |
+| `mt_color` | `{ unsigned char r, g, b, a; }`. |
+| `mt_metrics` | `width`, `height`, `ascent`, `descent`, `leading` (float); `origin_x`, `origin_y` (int pen origin); `align_dx` (float alignment shift). |
+| `mt_align` | `MT_ALIGN_LEFT`, `MT_ALIGN_RIGHT`, `MT_ALIGN_CENTER`, `MT_ALIGN_JUSTIFY`. |
+| `mt_error` | `MT_OK`, `MT_ERR_FONT`, `MT_ERR_TEXT`, `MT_ERR_OOM`, `MT_ERR_BACKEND`. |
+| `MICROTEXT_VERSION` | Monotonic feature level (currently 4); the surface only grows. |
+
+## Scope and non-goals
+
+- Renders to a CPU RGBA bitmap; no GPU, window, or event layer (you upload and draw).
+- One backend per platform via the OS engine; no portable from-scratch rasterizer.
+- Caching is the consumer's job; the library holds no glyph or layout cache.
+- Lays out and hit-tests, but owns no document, selection, or undo model.
+- Not yet: text decorations (underline, strikethrough), tab stops, per-glyph boxes.
+
 ## Backends
 
 | Platform | Engine | Status |
