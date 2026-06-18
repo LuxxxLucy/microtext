@@ -39,8 +39,9 @@
  * surface only grows: new functions and appended struct fields, never a
  * signature change, so a higher value is a strict superset of a lower one.
  *   1: initial surface.
- *   2: mt_shaped_caret_x / mt_shaped_byte_at_x hit-testing. */
-#define MICROTEXT_VERSION 2
+ *   2: mt_shaped_caret_x / mt_shaped_byte_at_x hit-testing.
+ *   3: mt_text_align / mt_text_line_height, mt_metrics.align_dx. */
+#define MICROTEXT_VERSION 3
 
 #ifdef __cplusplus
 extern "C" {
@@ -61,11 +62,16 @@ typedef struct {
  * (px, py) where py is the baseline, blit the bitmap top-left at
  * (px - origin_x, py - origin_y). Aligning two runs of different sizes is then
  * a matter of sharing py. mt_measure leaves origin_x/origin_y zero; they are
- * meaningful only on a rendered bitmap. */
+ * meaningful only on a rendered bitmap.
+ *
+ * align_dx is the horizontal offset to add to the pen x so a wrapped line sits
+ * under its paragraph alignment (see mt_text_align); it is zero for a
+ * left-aligned or justified line and for a single run. */
 typedef struct {
     float width, height;
     float ascent, descent, leading;
     int origin_x, origin_y;
+    float align_dx;
 } mt_metrics;
 
 typedef enum {
@@ -154,6 +160,13 @@ ptrdiff_t mt_shaped_byte_at_x(const mt_shaped *s, float x);
 typedef struct mt_text mt_text;
 typedef struct mt_block mt_block;
 
+typedef enum {
+    MT_ALIGN_LEFT = 0,  /* the default */
+    MT_ALIGN_RIGHT,
+    MT_ALIGN_CENTER,
+    MT_ALIGN_JUSTIFY    /* fill the width; the last line of a paragraph stays ragged */
+} mt_align;
+
 /* Start an empty paragraph. Free with mt_text_free. Returns NULL on OOM. */
 mt_text *mt_text_new(void);
 /* Append a styled run. features is a space-separated list of OpenType feature
@@ -161,6 +174,15 @@ mt_text *mt_text_new(void);
  * success, -1 on failure (see mt_last_error). len < 0 means NUL-terminated. */
 int mt_text_run(mt_text *t, const char *utf8, ptrdiff_t len, const mt_font *f,
                 mt_color color, const char *features);
+
+/* Paragraph alignment for the whole text; takes effect at wrap time and needs a
+ * positive wrap width. Left/right/center shift each line via mt_metrics.align_dx;
+ * justify stretches the line to the width (last line of a paragraph excepted). */
+void mt_text_align(mt_text *t, mt_align align);
+/* Multiply the baseline-to-baseline distance (mt_metrics.height) of every line;
+ * 1.0 or 0 is the font's natural spacing, 1.5 is one-and-a-half spacing. */
+void mt_text_line_height(mt_text *t, float multiple);
+
 void mt_text_free(mt_text *t);
 
 /* Lay the text out: wrap to max_width pixels (<= 0 wraps only at hard breaks)
@@ -698,6 +720,8 @@ static CTFontRef mt_font_with_features(CTFontRef base, const char *features)
 
 struct mt_text {
     CFMutableAttributedStringRef as;
+    mt_align align;
+    float line_height;  /* 0 = the font's natural spacing */
 };
 
 mt_text *mt_text_new(void)
@@ -766,6 +790,20 @@ int mt_text_run(mt_text *t, const char *utf8, ptrdiff_t len, const mt_font *f,
     CFRelease(s);
     mt_err = rc == 0 ? MT_OK : MT_ERR_OOM;
     return rc;
+}
+
+void mt_text_align(mt_text *t, mt_align align)
+{
+    if (t) {
+        t->align = align;
+    }
+}
+
+void mt_text_line_height(mt_text *t, float multiple)
+{
+    if (t) {
+        t->line_height = multiple;
+    }
 }
 
 void mt_text_free(mt_text *t)
@@ -846,18 +884,28 @@ mt_block *mt_text_wrap(const mt_text *t, float max_width)
         }
         CFIndex count = CTTypesetterSuggestLineBreak(ts, start, width);
         CFIndex end;
+        int para_last;  /* this line ends its paragraph (not a width break) */
         if (count <= 0 || start + count >= mb) {
             /* The paragraph's remainder fits; carry the break char into the
              * line so a blank line keeps the font's height. */
             end = mb < total ? mb + mblen : mb;
+            para_last = 1;
         } else {
             end = start + count;  /* width forces a break before the hard one */
+            para_last = 0;
         }
         CTLineRef line =
             CTTypesetterCreateLine(ts, CFRangeMake(start, end - start));
         if (!line) {
             mt_err = MT_ERR_BACKEND;
             goto fail;
+        }
+        if (t->align == MT_ALIGN_JUSTIFY && max_width > 0 && !para_last) {
+            CTLineRef j = CTLineCreateJustifiedLine(line, 1.0, (double)max_width);
+            if (j) {
+                CFRelease(line);
+                line = j;
+            }
         }
         if (b->n == cap) {
             int ncap = cap ? cap * 2 : 8;
@@ -897,6 +945,17 @@ mt_block *mt_text_wrap(const mt_text *t, float max_width)
         free(slice);
         if (!sh) {
             goto fail;  /* mt_err set; line released by helper */
+        }
+        if (t->line_height > 0) {
+            sh->m.height *= t->line_height;
+        }
+        if (max_width > 0) {
+            float slack = (float)max_width - sh->m.width;
+            if (t->align == MT_ALIGN_RIGHT) {
+                sh->m.align_dx = slack;
+            } else if (t->align == MT_ALIGN_CENTER) {
+                sh->m.align_dx = slack * 0.5f;
+            }
         }
         b->lines[b->n++] = sh;
         start = end;

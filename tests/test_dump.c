@@ -15,6 +15,7 @@
 /* Count failures so the process exit code reflects them. */
 static int g_fails;
 #define CHECK(cond) ((cond) ? "ok   " : (g_fails++, "FAIL "))
+#define NEAR(a, b, tol) ((a) - (b) < (tol) && (b) - (a) < (tol))
 
 static unsigned char *slurp(const char *path, unsigned long *n)
 {
@@ -296,6 +297,83 @@ int main(void)
         mt_text_free(t);
     }
 
+    /* alignment: left/right/center shift align_dx; justify fills the width */
+    {
+        const char *para =
+            "The quick brown fox jumps over the lazy dog and keeps running";
+        float wbox = 360.0f;
+        mt_text *tl = mt_text_new();
+        mt_text_run(tl, para, -1, f, ink, NULL);
+        mt_block *bl = mt_text_wrap(tl, wbox);
+        mt_text *tr = mt_text_new();
+        mt_text_align(tr, MT_ALIGN_RIGHT);
+        mt_text_run(tr, para, -1, f, ink, NULL);
+        mt_block *br = mt_text_wrap(tr, wbox);
+        mt_text *tc = mt_text_new();
+        mt_text_align(tc, MT_ALIGN_CENTER);
+        mt_text_run(tc, para, -1, f, ink, NULL);
+        mt_block *bc = mt_text_wrap(tc, wbox);
+        int ok = bl && br && bc && mt_block_lines(bl) >= 2;
+        if (ok) {
+            mt_metrics l0 = mt_shaped_metrics(mt_block_line(bl, 0));
+            mt_metrics r0 = mt_shaped_metrics(mt_block_line(br, 0));
+            mt_metrics c0 = mt_shaped_metrics(mt_block_line(bc, 0));
+            float expect = wbox - l0.width;
+            ok = l0.align_dx == 0.0f && r0.align_dx > 1.0f &&
+                 NEAR(r0.align_dx, expect, 1.0f) &&
+                 NEAR(c0.align_dx, expect * 0.5f, 1.0f);
+        }
+        printf("%s  align L/R/C       dx left=%.0f right=%.0f center=%.0f\n",
+               CHECK(ok), mt_shaped_metrics(mt_block_line(bl, 0)).align_dx,
+               mt_shaped_metrics(mt_block_line(br, 0)).align_dx,
+               mt_shaped_metrics(mt_block_line(bc, 0)).align_dx);
+        mt_block_free(bl);
+        mt_block_free(br);
+        mt_block_free(bc);
+        mt_text_free(tl);
+        mt_text_free(tr);
+        mt_text_free(tc);
+    }
+    {
+        const char *para =
+            "The quick brown fox jumps over the lazy dog and keeps running";
+        float wbox = 360.0f;
+        mt_text *t = mt_text_new();
+        mt_text_align(t, MT_ALIGN_JUSTIFY);
+        mt_text_run(t, para, -1, f, ink, NULL);
+        mt_block *b = mt_text_wrap(t, wbox);
+        int ok = b && mt_block_lines(b) >= 2;
+        if (ok) {
+            float w0 = mt_shaped_metrics(mt_block_line(b, 0)).width;
+            ok = w0 > wbox - 6.0f && w0 <= wbox + 2.0f;
+        }
+        printf("%s  align justify     line0 width %.0f -> box %.0f\n", CHECK(ok),
+               ok ? mt_shaped_metrics(mt_block_line(b, 0)).width : 0.0f, wbox);
+        mt_block_free(b);
+        mt_text_free(t);
+    }
+    {
+        /* line-height multiplies the baseline-to-baseline distance */
+        mt_text *t1 = mt_text_new();
+        mt_text_run(t1, "one\ntwo", -1, f, ink, NULL);
+        mt_block *b1 = mt_text_wrap(t1, 0.0f);
+        mt_text *t2 = mt_text_new();
+        mt_text_line_height(t2, 2.0f);
+        mt_text_run(t2, "one\ntwo", -1, f, ink, NULL);
+        mt_block *b2 = mt_text_wrap(t2, 0.0f);
+        int ok = b1 && b2 && mt_block_lines(b1) >= 1 && mt_block_lines(b2) >= 1;
+        float h1 = 0, h2 = 0;
+        if (ok) {
+            h1 = mt_shaped_metrics(mt_block_line(b1, 0)).height;
+            h2 = mt_shaped_metrics(mt_block_line(b2, 0)).height;
+            ok = NEAR(h2, h1 * 2.0f, 0.5f);
+        }
+        printf("%s  line-height 2x    %.1f -> %.1f\n", CHECK(ok), h1, h2);
+        mt_block_free(b1);
+        mt_block_free(b2);
+        mt_text_free(t1);
+        mt_text_free(t2);
+    }
     /* error channel */
     int w, h;
     int pass = 1;

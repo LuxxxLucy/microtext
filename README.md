@@ -73,11 +73,14 @@ mt_text_free(t);
 | --- | --- |
 | `mt_text_new()` | Start an empty paragraph. |
 | `mt_text_run(t, utf8, len, f, color, features)` | Append a styled run; `features` is a space-separated list of OpenType tags to enable (`"smcp tnum frac"`) or `NULL`. |
+| `mt_text_align(t, align)` | Paragraph alignment: `MT_ALIGN_LEFT` (default), `RIGHT`, `CENTER`, `JUSTIFY`. Needs a positive wrap width. |
+| `mt_text_line_height(t, multiple)` | Scale the baseline-to-baseline distance; `1.0` (or `0`) is natural, `1.5` is one-and-a-half spacing. |
 | `mt_text_wrap(t, max_width)` | Lay out and wrap to `max_width` pixels (`<= 0` = one line); returns a list of lines. |
 | `mt_block_lines(b)` / `mt_block_line(b, i)` | Line count, and line `i` as an `mt_shaped`. |
 | `mt_text_free(t)` / `mt_block_free(b)` | Release the builder and the line list. |
 
-Each line is an `mt_shaped`: stack them by advancing the pen y by each line's `mt_metrics.height`.
+Each line is an `mt_shaped`: stack them by advancing the pen y by each line's `mt_metrics.height`, and shift the pen x by `mt_metrics.align_dx` for non-left alignment.
+Left, right, and center position the laid-out line in the width; justify stretches it to the width, leaving the last line of each paragraph ragged.
 The Unicode mandatory breaks (UAX #14: LF, VT, FF, CR, CRLF, NEL, LS, PS) start a new line on their own; a blank line keeps the font's height.
 Which OpenType features a tag activates depends on the font (`smcp` needs a font with small caps).
 
