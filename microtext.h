@@ -40,8 +40,10 @@
  * signature change, so a higher value is a strict superset of a lower one.
  *   1: initial surface.
  *   2: mt_shaped_caret_x / mt_shaped_byte_at_x hit-testing.
- *   3: mt_text_align / mt_text_line_height, mt_metrics.align_dx. */
-#define MICROTEXT_VERSION 3
+ *   3: mt_text_align / mt_text_line_height, mt_metrics.align_dx.
+ *   4: mt_font_metrics; mt_shaped_selection; mt_block_line_y /
+ *      mt_block_height / mt_block_line_at_y / mt_block_line_source. */
+#define MICROTEXT_VERSION 4
 
 /* Linkage of the public functions, stb-style. The default is external linkage.
  * Define MICROTEXT_STATIC before including to fold the implementation privately
@@ -110,6 +112,11 @@ MICROTEXTDEF mt_font *mt_font_open_styled(const char *family, float pixel_size, 
 MICROTEXTDEF mt_font *mt_font_open_memory(const void *data, size_t len, float pixel_size);
 MICROTEXTDEF void mt_font_close(mt_font *f);
 
+/* The font's own vertical metrics (ascent, descent, leading, height) without
+ * shaping any text, for sizing rows and blank lines. width and the origin are
+ * left zero. */
+MICROTEXTDEF mt_metrics mt_font_metrics(const mt_font *f);
+
 /* Both calls lay out exactly one line. Embedded newlines are not breaks; to
  * draw a paragraph, split on '\n' yourself and stack the lines, advancing the
  * pen y by mt_metrics.height per line. An empty run yields a minimal
@@ -165,6 +172,15 @@ MICROTEXTDEF void mt_shaped_free(mt_shaped *s);
 MICROTEXTDEF float mt_shaped_caret_x(const mt_shaped *s, ptrdiff_t byte_off);
 MICROTEXTDEF ptrdiff_t mt_shaped_byte_at_x(const mt_shaped *s, float x);
 
+/* Visual x-spans the byte range [a, b) covers on the line, for drawing a
+ * selection highlight. Writes up to max_pairs (x0, x1) pairs into out (which
+ * must hold max_pairs*2 floats) and returns how many were written. A bidi line
+ * splits one logical range into several disjoint spans; an LTR range is one
+ * span. Each x is on the line's own axis (the mt_shaped_caret_x axis), so it
+ * excludes mt_metrics.align_dx. */
+MICROTEXTDEF int mt_shaped_selection(const mt_shaped *s, ptrdiff_t a, ptrdiff_t b,
+                                     float *out, int max_pairs);
+
 /* Rich, multi-run text and width-based line wrapping.
  *
  * Build text from styled runs, then lay it out: a width <= 0 wraps only at
@@ -212,6 +228,21 @@ MICROTEXTDEF int mt_block_lines(const mt_block *b);
 /* Borrow line i (0-based); owned by the block, valid until mt_block_free. The
  * const return marks the borrow: never pass a block line to mt_shaped_free. */
 MICROTEXTDEF const mt_shaped *mt_block_line(const mt_block *b, int i);
+
+/* Vertical geometry of the stacked block, for mapping a click y to a line. The
+ * block stacks lines top to bottom by mt_metrics.height; mt_block_line_y is the
+ * top of line i (its baseline is that plus the line's ascent), mt_block_height
+ * is the total, and mt_block_line_at_y is the line a y falls in (clamped to
+ * [0, lines-1]). Draw with these same values so click-to-line round-trips. */
+MICROTEXTDEF float mt_block_line_y(const mt_block *b, int i);
+MICROTEXTDEF float mt_block_height(const mt_block *b);
+MICROTEXTDEF int mt_block_line_at_y(const mt_block *b, float y);
+
+/* Byte span of line i within the text's UTF-8 (the concatenation of the run
+ * bytes). Returns the start byte offset and, via out_len (may be NULL), the
+ * length, so a line-relative hit-test offset maps back to a document position. */
+MICROTEXTDEF ptrdiff_t mt_block_line_source(const mt_block *b, int i, ptrdiff_t *out_len);
+
 MICROTEXTDEF void mt_block_free(mt_block *b);
 
 #ifdef __cplusplus
@@ -360,6 +391,25 @@ MICROTEXTDEF void mt_font_close(mt_font *f)
         CFRelease(f->ct);
     }
     MICROTEXT_FREE(f);
+}
+
+MICROTEXTDEF mt_metrics mt_font_metrics(const mt_font *f)
+{
+    mt_metrics m;
+    memset(&m, 0, sizeof(m));
+    if (!f) {
+        mt_err = MT_ERR_FONT;
+        return m;
+    }
+    CGFloat ascent = CTFontGetAscent(f->ct);
+    CGFloat descent = CTFontGetDescent(f->ct);
+    CGFloat leading = CTFontGetLeading(f->ct);
+    m.ascent = (float)ascent;
+    m.descent = (float)descent;
+    m.leading = (float)leading;
+    m.height = (float)(ascent + descent + leading);
+    mt_err = MT_OK;
+    return m;
 }
 
 /* Build a shaped line; CoreText applies bidi, fallback, and color glyphs.
@@ -651,6 +701,57 @@ MICROTEXTDEF ptrdiff_t mt_shaped_byte_at_x(const mt_shaped *s, float x)
     }
     mt_err = MT_OK;
     return mt_u16_to_byte(s->txt, s->nbytes, rel);
+}
+
+MICROTEXTDEF int mt_shaped_selection(const mt_shaped *s, ptrdiff_t a, ptrdiff_t b,
+                                     float *out, int max_pairs)
+{
+    if (!s) {
+        mt_err = MT_ERR_FONT;
+        return 0;
+    }
+    mt_err = MT_OK;
+    if (a > b) {
+        ptrdiff_t t = a;
+        a = b;
+        b = t;
+    }
+    if (a < 0) {
+        a = 0;
+    }
+    if (b > s->nbytes) {
+        b = s->nbytes;
+    }
+    if (a >= b || !out || max_pairs <= 0) {
+        return 0;
+    }
+    CFIndex lo = s->u16_base + mt_u16_count(s->txt, s->nbytes, a);
+    CFIndex hi = s->u16_base + mt_u16_count(s->txt, s->nbytes, b);
+    CFArrayRef runs = CTLineGetGlyphRuns(s->line);
+    CFIndex nruns = runs ? CFArrayGetCount(runs) : 0;
+    int count = 0;
+    /* Runs are in visual order; each run is unidirectional, so a logical range
+     * clipped to a run is one visual span. Bidi yields disjoint spans. */
+    for (CFIndex r = 0; r < nruns && count < max_pairs; r++) {
+        CTRunRef run = (CTRunRef)CFArrayGetValueAtIndex(runs, r);
+        CFRange rr = CTRunGetStringRange(run);
+        CFIndex i0 = lo > rr.location ? lo : rr.location;
+        CFIndex i1 = hi < rr.location + rr.length ? hi : rr.location + rr.length;
+        if (i0 >= i1) {
+            continue;
+        }
+        CGFloat x0 = CTLineGetOffsetForStringIndex(s->line, i0, NULL);
+        CGFloat x1 = CTLineGetOffsetForStringIndex(s->line, i1, NULL);
+        if (x1 < x0) {  /* RTL run: offsets descend with index */
+            CGFloat t = x0;
+            x0 = x1;
+            x1 = t;
+        }
+        out[count * 2] = (float)x0;
+        out[count * 2 + 1] = (float)x1;
+        count++;
+    }
+    return count;
 }
 
 MICROTEXTDEF mt_metrics mt_measure(const mt_font *f, const char *utf8, ptrdiff_t len)
@@ -1019,6 +1120,59 @@ MICROTEXTDEF const mt_shaped *mt_block_line(const mt_block *b, int i)
         return NULL;
     }
     return b->lines[i];
+}
+
+MICROTEXTDEF float mt_block_line_y(const mt_block *b, int i)
+{
+    if (!b || i < 0) {
+        return 0.0f;
+    }
+    if (i > b->n) {
+        i = b->n;
+    }
+    float y = 0.0f;
+    for (int k = 0; k < i; k++) {
+        y += b->lines[k]->m.height;
+    }
+    return y;
+}
+
+MICROTEXTDEF float mt_block_height(const mt_block *b)
+{
+    return b ? mt_block_line_y(b, b->n) : 0.0f;
+}
+
+MICROTEXTDEF int mt_block_line_at_y(const mt_block *b, float y)
+{
+    if (!b || b->n == 0 || y < 0.0f) {
+        return 0;
+    }
+    float top = 0.0f;
+    for (int i = 0; i < b->n; i++) {
+        top += b->lines[i]->m.height;
+        if (y < top) {
+            return i;
+        }
+    }
+    return b->n - 1;
+}
+
+MICROTEXTDEF ptrdiff_t mt_block_line_source(const mt_block *b, int i, ptrdiff_t *out_len)
+{
+    if (out_len) {
+        *out_len = 0;
+    }
+    if (!b || i < 0 || i >= b->n) {
+        return 0;
+    }
+    ptrdiff_t start = 0;
+    for (int k = 0; k < i; k++) {
+        start += b->lines[k]->nbytes;
+    }
+    if (out_len) {
+        *out_len = b->lines[i]->nbytes;
+    }
+    return start;
 }
 
 MICROTEXTDEF void mt_block_free(mt_block *b)

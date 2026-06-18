@@ -377,6 +377,80 @@ int main(void)
         mt_text_free(t1);
         mt_text_free(t2);
     }
+    {
+        /* font metrics without shaping agree with a shaped line */
+        mt_metrics fm = mt_font_metrics(f);
+        mt_metrics sm = mt_measure(f, "Mg", -1);
+        int ok = fm.height > 0 && NEAR(fm.ascent, sm.ascent, 0.01f) &&
+                 NEAR(fm.descent, sm.descent, 0.01f);
+        printf("%s  font metrics      ascent=%.1f height=%.1f\n", CHECK(ok),
+               fm.ascent, fm.height);
+    }
+    {
+        /* block geometry: line_at_y inverts the stacking, source spans
+           partition the text, height totals the stack, selection covers a line */
+        const char *para = "alpha beta gamma delta epsilon zeta eta theta iota";
+        mt_text *t = mt_text_new();
+        mt_text_run(t, para, -1, f, ink, NULL);
+        mt_block *b = mt_text_wrap(t, 120.0f);
+        int n = mt_block_lines(b);
+        int ok = n >= 2;
+        for (int i = 0; ok && i < n; i++) {
+            if (mt_block_line_at_y(b, mt_block_line_y(b, i) + 1.0f) != i) {
+                ok = 0;
+            }
+        }
+        ptrdiff_t expect = 0;
+        for (int i = 0; ok && i < n; i++) {
+            ptrdiff_t len, start = mt_block_line_source(b, i, &len);
+            if (start != expect) {
+                ok = 0;
+            }
+            expect += len;
+        }
+        if (ok && expect != (ptrdiff_t)strlen(para)) {
+            ok = 0;
+        }
+        if (ok) {
+            float last = mt_block_line_y(b, n - 1) +
+                         mt_shaped_metrics(mt_block_line(b, n - 1)).height;
+            ok = NEAR(mt_block_height(b), last, 0.01f);
+        }
+        if (ok) {
+            ptrdiff_t llen;
+            mt_block_line_source(b, 0, &llen);
+            float sp[8];
+            int sn = mt_shaped_selection(mt_block_line(b, 0), 0, llen, sp, 4);
+            float w0 = mt_shaped_metrics(mt_block_line(b, 0)).width;
+            ok = sn >= 1 && sp[0] < 1.0f && sp[sn * 2 - 1] > w0 - 30.0f;
+        }
+        printf("%s  block geometry    %d lines, y+source+selection round-trip\n",
+               CHECK(ok), n);
+        mt_block_free(b);
+        mt_text_free(t);
+    }
+    {
+        /* a bidi line splits one logical range into disjoint visual spans */
+        mt_text *t = mt_text_new();
+        mt_text_run(t, "abc \xD7\x90\xD7\x91\xD7\x92 xyz", -1, f, ink, NULL);
+        mt_block *b = mt_text_wrap(t, 0.0f);
+        int ok = mt_block_lines(b) == 1;
+        if (ok) {
+            ptrdiff_t llen;
+            mt_block_line_source(b, 0, &llen);
+            float sp[16];
+            int sn = mt_shaped_selection(mt_block_line(b, 0), 0, llen, sp, 8);
+            ok = sn >= 1;
+            for (int i = 0; ok && i < sn; i++) {
+                if (sp[i * 2] > sp[i * 2 + 1]) {  /* each span is ordered */
+                    ok = 0;
+                }
+            }
+        }
+        printf("%s  bidi selection    spans ordered on a mixed line\n", CHECK(ok));
+        mt_block_free(b);
+        mt_text_free(t);
+    }
     /* error channel */
     int w, h;
     int pass = 1;
