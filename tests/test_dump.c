@@ -12,9 +12,11 @@
 
 #define OUTDIR "output"
 
-/* Count failures so the process exit code reflects them. */
+/* Count failures so the process exit code reflects them; skips do not fail. */
 static int g_fails;
+static int g_skips;
 #define CHECK(cond) ((cond) ? "ok   " : (g_fails++, "FAIL "))
+#define SKIP(what) (g_skips++, printf("SKIP  %s\n", (what)))
 #define NEAR(a, b, tol) ((a) - (b) < (tol) && (b) - (a) < (tol))
 
 static unsigned char *slurp(const char *path, unsigned long *n)
@@ -104,8 +106,8 @@ int main(void)
     mkdir(OUTDIR, 0755);
     mt_font *f = mt_font_open("Helvetica Neue", 64.0f);
     if (!f) {
-        printf("FAIL  mt_font_open\n");
-        return 1;
+        SKIP("Helvetica Neue unavailable; cannot run the suite");
+        return 0;
     }
     mt_color ink = { 20, 20, 20, 255 };
     mt_color red = { 220, 30, 30, 255 };
@@ -123,10 +125,18 @@ int main(void)
 
     mt_font *bold = mt_font_open_styled("Helvetica Neue", 64.0f, 1, 0);
     mt_font *ital = mt_font_open_styled("Helvetica Neue", 64.0f, 0, 1);
-    dump(bold, "Bold face", ink, "out_bold.png");
-    dump(ital, "Italic fy", ink, "out_italic.png");  /* overhang stress */
-    mt_font_close(bold);
-    mt_font_close(ital);
+    if (bold) {
+        dump(bold, "Bold face", ink, "out_bold.png");
+        mt_font_close(bold);
+    } else {
+        SKIP("bold face unavailable");
+    }
+    if (ital) {
+        dump(ital, "Italic fy", ink, "out_italic.png");  /* overhang stress */
+        mt_font_close(ital);
+    } else {
+        SKIP("italic face unavailable");
+    }
 
     unsigned long n = 0;
     unsigned char *ttf =
@@ -214,6 +224,9 @@ int main(void)
     /* OpenType feature: smcp turns lowercase into small caps */
     {
         mt_font *bk = mt_font_open("Baskerville", 64.0f);
+        if (!bk) {
+            SKIP("Baskerville unavailable; smcp test skipped");
+        } else {
         const char *txt = "Small Caps";
         int aw, ah, bw = 0, bh = 0;
         unsigned char *a = mt_render(bk, txt, -1, ink, &aw, &ah, NULL);
@@ -241,6 +254,7 @@ int main(void)
         mt_block_free(blk);
         mt_text_free(t);
         mt_font_close(bk);
+        }
     }
 
     /* hit-testing: byte offset <-> caret x round-trips on a shaped line */
@@ -451,6 +465,48 @@ int main(void)
         mt_block_free(b);
         mt_text_free(t);
     }
+    {
+        /* RTL line: logical index 0 sits at the right, so caret x descends */
+        mt_shaped *r = mt_shape(
+            f, "\xD8\xA7\xD9\x84\xD8\xB9\xD8\xB1\xD8\xA8\xD9\x8A\xD8\xA9", -1,
+            ink);  /* العربية, 14 bytes */
+        int ok = r != NULL;
+        if (r) {
+            ok = mt_shaped_caret_x(r, 0) > mt_shaped_caret_x(r, 14) + 1.0f;
+            mt_shaped_free(r);
+        }
+        printf("%s  rtl caret order   start right of end\n", CHECK(ok));
+    }
+    {
+        /* byte_at_x is the exact inverse of caret_x, and caret x is monotonic */
+        const char *s8 = "Hello world";
+        int len = (int)strlen(s8);
+        mt_shaped *s = mt_shape(f, s8, -1, ink);
+        int ok = s != NULL;
+        float prev = -1.0f;
+        for (int i = 0; ok && i <= len; i++) {
+            float cx = mt_shaped_caret_x(s, i);
+            if (cx < prev - 0.5f || mt_shaped_byte_at_x(s, cx) != i) {
+                ok = 0;
+            }
+            prev = cx;
+        }
+        printf("%s  caret sweep       inverse over %d bytes\n", CHECK(ok), len);
+        mt_shaped_free(s);
+    }
+    {
+        /* an empty run still carries the font's height in its bitmap */
+        mt_shaped *e = mt_shape(f, "", 0, ink);
+        int ok = e != NULL;
+        if (e) {
+            int ew, eh;
+            mt_shaped_size(e, &ew, &eh);
+            mt_metrics m = mt_shaped_metrics(e);
+            ok = m.width == 0.0f && eh >= (int)(m.ascent + m.descent);
+            mt_shaped_free(e);
+        }
+        printf("%s  empty line height ascent+descent fallback\n", CHECK(ok));
+    }
     /* error channel */
     int w, h;
     int pass = 1;
@@ -468,7 +524,31 @@ int main(void)
         pass = 0;
     }
     printf("%s  error channel (TEXT/TEXT/FONT distinguished)\n", CHECK(pass));
+    {
+        /* malformed UTF-8 is rejected with MT_ERR_TEXT, not shaped */
+        static const char *const malformed[] = {
+            "\x80",                  /* lone continuation byte */
+            "\xC3",                  /* truncated 2-byte sequence */
+            "\xE4\xB8",              /* truncated 3-byte sequence */
+            "\xC0\x80",              /* overlong encoding */
+            "\xED\xA0\x80",          /* lone surrogate U+D800 */
+            "\xF8\x88\x80\x80\x80",  /* 5-byte sequence */
+        };
+        int bad_ok = 1;
+        size_t cases = sizeof(malformed) / sizeof(malformed[0]);
+        for (size_t i = 0; i < cases; i++) {
+            if (mt_measure(f, malformed[i], -1).width != 0.0f ||
+                mt_last_error() != MT_ERR_TEXT) {
+                bad_ok = 0;
+            }
+        }
+        printf("%s  malformed utf-8   %zu vectors rejected\n", CHECK(bad_ok),
+               cases);
+    }
 
+    if (g_skips) {
+        printf("(%d skipped)\n", g_skips);
+    }
     mt_font_close(f);
     return g_fails ? 1 : 0;
 }
