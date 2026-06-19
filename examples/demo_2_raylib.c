@@ -5,13 +5,15 @@
 
 #include "raylib.h"
 
+#define MAX_LINES 32 /* per-paragraph line cap */
+
 /* A wrapped block baked to one texture per line, laid out once. */
 typedef struct {
     Texture2D tex;
     int dx, dy;
 } demo_line;
 typedef struct {
-    demo_line lines[32];
+    demo_line lines[MAX_LINES];
     int n;
     float h;
 } demo_para;
@@ -20,7 +22,7 @@ static demo_para bake(mt_block *b)
 {
     demo_para p = { 0 };
     int y = 0;
-    for (int i = 0; i < mt_block_lines(b) && i < 32; i++) {
+    for (int i = 0; i < mt_block_lines(b) && i < MAX_LINES; i++) {
         const mt_shaped *ln = mt_block_line(b, i);
         mt_metrics m = mt_shaped_metrics(ln);
         int w, h;

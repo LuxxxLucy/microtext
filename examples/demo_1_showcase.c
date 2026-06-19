@@ -13,6 +13,7 @@
 #define H 812
 #define CAP_X 48   /* caption column */
 #define SAMP_X 300 /* sample column */
+#define OUT_PNG "output/showcase.png"
 
 static unsigned char *cv; /* W*H opaque RGBA canvas */
 
@@ -167,8 +168,8 @@ int main(void)
         mt_text_free(t);
     }
 
-    stbi_write_png("output/showcase.png", W, H, 4, cv, W * 4);
-    printf("wrote output/showcase.png  %dx%d\n", W, H);
+    stbi_write_png(OUT_PNG, W, H, 4, cv, W * 4);
+    printf("wrote %s  %dx%d\n", OUT_PNG, W, H);
 
     free(cv);
     mt_font_close(title);
