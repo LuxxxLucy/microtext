@@ -17,7 +17,7 @@ Vendor it: drop `microtext.h` into your tree and `#define MICROTEXT_IMPLEMENTATI
 ![The raylib demo: Latin, CJK, Korean, Arabic and Hebrew, color emoji, multi-font runs, small caps, and a wrapped paragraph, all rendered by microtext](assets/demo.png)
 
 The `microtext + raylib` demo (`examples/demo_2_raylib.c`); every glyph is one microtext bitmap uploaded as a texture.
-A headless variant, `make demo_1_showcase`, writes the same gallery to `output/showcase.png` with no window.
+A headless variant, `make run_demo_1_showcase`, writes the same gallery to `output/showcase.png` with no window.
 
 ## Usage
 
@@ -164,8 +164,10 @@ Each backend sits behind the same `mt_*` API; the others are a compile error unt
 make test       # render samples and check them (exits non-zero on failure)
 make sanitize   # the test under AddressSanitizer + UBSan
 make leaks      # the test under the macOS leaks tool
-make demo_1_showcase  # render every feature to output/showcase.png
-make demo_2_raylib    # build the interactive raylib demo (needs brew raylib); run ./examples/demo_2_raylib
+make demo_1_showcase      # build the headless gallery demo
+make run_demo_1_showcase  # build and render every feature to output/showcase.png
+make demo_2_raylib        # build the interactive raylib demo (needs brew raylib)
+make run_demo_2_raylib    # build and open the raylib demo window
 ```
 
 ## Configuration

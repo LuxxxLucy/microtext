@@ -10,7 +10,7 @@ RL_FLAGS := -I$(RAYLIB)/include -L$(RAYLIB)/lib -lraylib
 RL_FW    := -framework Cocoa -framework IOKit -framework CoreVideo \
             -framework OpenGL
 
-.PHONY: all test sanitize leaks golden fuzz demo_1_showcase demo_2_raylib clean
+.PHONY: all test sanitize leaks golden fuzz demo_1_showcase run_demo_1_showcase demo_2_raylib run_demo_2_raylib clean
 all: test examples/demo_1_showcase examples/demo_2_raylib
 
 test: tests/test_dump
@@ -43,17 +43,20 @@ fuzz: tests/fuzz.c microtext.h
 	$(CC) $(SANFLAGS) $< -o tests/fuzz $(MAC_FW)
 	./tests/fuzz
 
+# The demo_* targets build only; the run_demo_* targets build and run.
 demo_1_showcase: examples/demo_1_showcase
-	@mkdir -p output
-	./examples/demo_1_showcase
 examples/demo_1_showcase: examples/demo_1_showcase.c microtext.h tests/3rd/stb_image_write.h
 	$(CC) $(CFLAGS) $< -o $@ $(MAC_FW)
+run_demo_1_showcase: examples/demo_1_showcase
+	@mkdir -p output
+	./examples/demo_1_showcase
 
-# Build only; the demo opens a blocking window. Run it yourself:
-# ./examples/demo_2_raylib
 demo_2_raylib: examples/demo_2_raylib
 examples/demo_2_raylib: examples/demo_2_raylib.c examples/mt_raylib.h microtext.h
 	$(CC) $(CFLAGS) $< -o $@ $(RL_FLAGS) $(MAC_FW) $(RL_FW)
+# Opens a blocking window.
+run_demo_2_raylib: examples/demo_2_raylib
+	./examples/demo_2_raylib
 
 clean:
 	rm -rf tests/test_dump tests/test_dump_san tests/golden_test tests/fuzz \
