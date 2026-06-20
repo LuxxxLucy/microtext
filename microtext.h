@@ -469,6 +469,30 @@ MICROTEXTDEF mt_metrics mt_font_metrics(const mt_font *f)
     return m;
 }
 
+// Set s in font and color as an attributed string. Returns NULL on OOM.
+static CFAttributedStringRef mt_attr_string(CFStringRef s, CTFontRef font,
+                                            mt_color c)
+{
+    CGFloat comps[4] = { c.r / 255.0, c.g / 255.0, c.b / 255.0, c.a / 255.0 };
+    CGColorRef color = CGColorCreate(mt_srgb(), comps);
+    if (!color) {
+        return NULL;
+    }
+    CFStringRef keys[2] = { kCTFontAttributeName,
+                            kCTForegroundColorAttributeName };
+    CFTypeRef vals[2] = { font, color };
+    CFDictionaryRef attrs = CFDictionaryCreate(
+        NULL, (const void **)keys, (const void **)vals, 2,
+        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFAttributedStringRef as = NULL;
+    if (attrs) {
+        as = CFAttributedStringCreate(NULL, s, attrs);
+        CFRelease(attrs);
+    }
+    CGColorRelease(color);
+    return as;
+}
+
 /* Build a shaped line; CoreText applies bidi, fallback, and color glyphs.
  * Sets mt_err on every failure path. */
 static CTLineRef mt_line(const mt_font *f, const char *utf8, ptrdiff_t len,
@@ -485,31 +509,14 @@ static CTLineRef mt_line(const mt_font *f, const char *utf8, ptrdiff_t len,
         mt_err = MT_ERR_TEXT;
         return NULL;
     }
-    CGFloat comps[4] = { c.r / 255.0, c.g / 255.0, c.b / 255.0, c.a / 255.0 };
-    CGColorRef color = CGColorCreate(mt_srgb(), comps);
-    if (!color) {
-        CFRelease(s);
+    CFAttributedStringRef as = mt_attr_string(s, f->ct, c);
+    CFRelease(s);
+    if (!as) {
         mt_err = MT_ERR_OOM;
         return NULL;
     }
-
-    CFStringRef keys[2] = { kCTFontAttributeName,
-                            kCTForegroundColorAttributeName };
-    CFTypeRef vals[2] = { f->ct, color };
-    CFDictionaryRef attrs = CFDictionaryCreate(
-        NULL, (const void **)keys, (const void **)vals, 2,
-        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-    CTLineRef line = NULL;
-    if (attrs) {
-        CFAttributedStringRef as = CFAttributedStringCreate(NULL, s, attrs);
-        if (as) {
-            line = CTLineCreateWithAttributedString(as);
-            CFRelease(as);
-        }
-        CFRelease(attrs);
-    }
-    CGColorRelease(color);
-    CFRelease(s);
+    CTLineRef line = CTLineCreateWithAttributedString(as);
+    CFRelease(as);
     if (!line) {
         mt_err = MT_ERR_OOM;
     }
@@ -633,16 +640,14 @@ MICROTEXTDEF unsigned char *mt_shaped_render(const mt_shaped *s,
     }
     int w = s->w, h = s->h;
     unsigned char *buf = dst;
-    if (buf) {
-        memset(buf, 0, (size_t)w * h * 4);
-    } else {
+    if (!buf) {
         buf = (unsigned char *)MICROTEXT_MALLOC((size_t)w * h * 4);
         if (!buf) {
             mt_err = MT_ERR_OOM;
             return NULL;
         }
-        memset(buf, 0, (size_t)w * h * 4);
     }
+    memset(buf, 0, (size_t)w * h * 4);
     CGContextRef ctx = CGBitmapContextCreate(
         buf, w, h, 8, (size_t)w * 4, mt_srgb(), kCGImageAlphaPremultipliedLast);
     if (!ctx) {
@@ -691,13 +696,19 @@ MICROTEXTDEF void mt_shaped_free(mt_shaped *s)
     MICROTEXT_FREE(s);
 }
 
+// UTF-16 index in the source string for a byte offset into this line's text.
+static CFIndex mt_line_u16(const mt_shaped *s, ptrdiff_t byte_off)
+{
+    return s->u16_base + mt_u16_count(s->txt, s->nbytes, byte_off);
+}
+
 MICROTEXTDEF float mt_shaped_caret_x(const mt_shaped *s, ptrdiff_t byte_off)
 {
     if (!s) {
         mt_err = MT_ERR_FONT;
         return 0.0f;
     }
-    CFIndex idx = s->u16_base + mt_u16_count(s->txt, s->nbytes, byte_off);
+    CFIndex idx = mt_line_u16(s, byte_off);
     CGFloat x = CTLineGetOffsetForStringIndex(s->line, idx, NULL);
     mt_err = MT_OK;
     return (float)x;
@@ -741,8 +752,8 @@ MICROTEXTDEF int mt_shaped_selection(const mt_shaped *s, ptrdiff_t a,
     if (a >= b || !out || max_pairs <= 0) {
         return 0;
     }
-    CFIndex lo = s->u16_base + mt_u16_count(s->txt, s->nbytes, a);
-    CFIndex hi = s->u16_base + mt_u16_count(s->txt, s->nbytes, b);
+    CFIndex lo = mt_line_u16(s, a);
+    CFIndex hi = mt_line_u16(s, b);
     CFArrayRef runs = CTLineGetGlyphRuns(s->line);
     CFIndex nruns = runs ? CFArrayGetCount(runs) : 0;
     int count = 0;
@@ -914,37 +925,20 @@ MICROTEXTDEF int mt_text_run(mt_text *t, const char *utf8, ptrdiff_t len,
         return -1;
     }
     CTFontRef font = mt_font_with_features(f->ct, features);
-    CGFloat comps[4] = { color.r / 255.0, color.g / 255.0, color.b / 255.0,
-                         color.a / 255.0 };
-    CGColorRef col = CGColorCreate(mt_srgb(), comps);
-    int rc = -1;
-    if (col) {
-        CFStringRef keys[2] = { kCTFontAttributeName,
-                                kCTForegroundColorAttributeName };
-        CFTypeRef vals[2] = { font, col };
-        CFDictionaryRef attrs = CFDictionaryCreate(
-            NULL, (const void **)keys, (const void **)vals, 2,
-            &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-        if (attrs) {
-            CFAttributedStringRef run =
-                CFAttributedStringCreate(NULL, s, attrs);
-            if (run) {
-                CFIndex cur = CFAttributedStringGetLength(t->as);
-                CFAttributedStringReplaceAttributedString(
-                    t->as, CFRangeMake(cur, 0), run);
-                CFRelease(run);
-                rc = 0;
-            }
-            CFRelease(attrs);
-        }
-        CGColorRelease(col);
-    }
+    CFAttributedStringRef run = mt_attr_string(s, font, color);
+    CFRelease(s);
     if (font) {
         CFRelease(font);
     }
-    CFRelease(s);
-    mt_err = rc == 0 ? MT_OK : MT_ERR_OOM;
-    return rc;
+    if (!run) {
+        mt_err = MT_ERR_OOM;
+        return -1;
+    }
+    CFIndex cur = CFAttributedStringGetLength(t->as);
+    CFAttributedStringReplaceAttributedString(t->as, CFRangeMake(cur, 0), run);
+    CFRelease(run);
+    mt_err = MT_OK;
+    return 0;
 }
 
 MICROTEXTDEF void mt_text_align(mt_text *t, mt_align align)
