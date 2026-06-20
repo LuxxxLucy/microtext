@@ -10,7 +10,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#define OUTDIR "output"
+#define OUTDIR "build/output"
 
 // Count failures so the process exit code reflects them; skips do not fail.
 static int g_fails;

@@ -12,10 +12,10 @@ jobs:
       - name: Install raylib
         run: brew install raylib
       - name: Build and test
-        run: make all
+        run: ./build/build.sh all
       - name: Sanitizers (ASan + UBSan)
-        run: make sanitize
+        run: ./build/build.sh sanitize
       - name: Leak check
-        run: make leaks
+        run: ./build/build.sh leaks
       - name: Fuzz seed replay
-        run: make fuzz
+        run: ./build/build.sh fuzz

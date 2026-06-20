@@ -13,7 +13,7 @@
 #define H 812
 #define CAP_X 48   // caption column
 #define SAMP_X 300 // sample column
-#define OUT_PNG "output/showcase.png"
+#define OUT_PNG "build/output/showcase.png"
 
 static unsigned char *cv; // W*H opaque RGBA canvas
 

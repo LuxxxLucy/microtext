@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 3.15)
 project(microtext LANGUAGES C)
 
-# Header-only: an INTERFACE target carrying the include path and, on macOS, the
-# CoreText frameworks, so a consumer links `microtext::microtext` and nothing else.
+# Header-only INTERFACE target. microtext.h sits one level up, at the repo root.
+# Consume with add_subdirectory(microtext/build) or find_package(microtext).
 add_library(microtext INTERFACE)
 add_library(microtext::microtext ALIAS microtext)
 
 target_include_directories(microtext INTERFACE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
     $<INSTALL_INTERFACE:include>)
 target_compile_features(microtext INTERFACE c_std_99)
 
@@ -19,7 +19,7 @@ if(APPLE)
 endif()
 
 include(GNUInstallDirs)
-install(FILES microtext.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../microtext.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(TARGETS microtext EXPORT microtextTargets)
 install(EXPORT microtextTargets
     NAMESPACE microtext::
