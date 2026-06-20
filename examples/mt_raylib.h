@@ -20,12 +20,12 @@
 #include "../microtext.h"
 #include "raylib.h"
 
-/* Draw a UTF-8 run with its top-left at (x, y). */
+// Draw a UTF-8 run with its top-left at (x, y).
 void mtr_text(mt_font *f, const char *utf8, float x, float y, mt_color color);
-/* Release every cached texture. */
+// Release every cached texture.
 void mtr_shutdown(void);
 
-#endif /* MT_RAYLIB_H */
+#endif // MT_RAYLIB_H
 
 #ifdef MT_RAYLIB_IMPLEMENTATION
 #ifndef MT_RAYLIB_IMPLEMENTATION_ONCE
@@ -90,5 +90,5 @@ void mtr_shutdown(void)
     }
 }
 
-#endif /* MT_RAYLIB_IMPLEMENTATION_ONCE */
-#endif /* MT_RAYLIB_IMPLEMENTATION */
+#endif // MT_RAYLIB_IMPLEMENTATION_ONCE
+#endif // MT_RAYLIB_IMPLEMENTATION

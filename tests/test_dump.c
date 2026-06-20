@@ -1,4 +1,4 @@
-/* Render sample runs to PNGs for visual inspection. */
+// Render sample runs to PNGs for visual inspection.
 #define MICROTEXT_IMPLEMENTATION
 #include "../microtext.h"
 
@@ -12,7 +12,7 @@
 
 #define OUTDIR "output"
 
-/* Count failures so the process exit code reflects them; skips do not fail. */
+// Count failures so the process exit code reflects them; skips do not fail.
 static int g_fails;
 static int g_skips;
 #define CHECK(cond) ((cond) ? "ok   " : (g_fails++, "FAIL "))
@@ -38,7 +38,7 @@ static unsigned char *slurp(const char *path, unsigned long *n)
     return b;
 }
 
-/* Stack a wrapped block's lines onto one canvas, each on its own baseline. */
+// Stack a wrapped block's lines onto one canvas, each on its own baseline.
 static void composite_block(mt_block *b, const char *path)
 {
     int n = mt_block_lines(b);
@@ -96,8 +96,8 @@ static void dump(mt_font *f, const char *text, mt_color c, const char *path)
     char full[256];
     snprintf(full, sizeof(full), "%s/%s", OUTDIR, path);
     stbi_write_png(full, w, h, 4, px, w * 4);
-    printf("ok    %-16s  %dx%d  advance=%.1f ascent=%.1f origin=(%d,%d)\n", path,
-           w, h, m.width, m.ascent, m.origin_x, m.origin_y);
+    printf("ok    %-16s  %dx%d  advance=%.1f ascent=%.1f origin=(%d,%d)\n",
+           path, w, h, m.width, m.ascent, m.origin_x, m.origin_y);
     mt_free(px);
 }
 
@@ -112,16 +112,15 @@ int main(void)
     mt_color ink = { 20, 20, 20, 255 };
     mt_color red = { 220, 30, 30, 255 };
 
-    dump(f, "Ap Red", red, "out_latin.png");        /* orientation + color */
-    dump(f, "中文 日本語 한국어", ink,
-         "out_cjk.png");                             /* CJK fallback */
-    dump(f, "العربية", ink,
-         "out_arabic.png");                          /* RTL bidi + shaping */
-    dump(f, "Hello مرحبا \U0001F30D 世界 "
-            "\U0001F3B5",
-         ink, "out_mixed.png");                      /* bidi + emoji + CJK */
+    dump(f, "Ap Red", red, "out_latin.png");           // orientation + color
+    dump(f, "中文 日本語 한국어", ink, "out_cjk.png"); // CJK fallback
+    dump(f, "العربية", ink, "out_arabic.png");         // RTL bidi + shaping
+    dump(f,
+         "Hello مرحبا \U0001F30D 世界 "
+         "\U0001F3B5",
+         ink, "out_mixed.png"); // bidi + emoji + CJK
     dump(f, "\U0001F3B5\U0001F525\U0001F30D\U0001F600\U0001F44D", ink,
-         "out_emoji.png");                           /* color emoji */
+         "out_emoji.png"); // color emoji
 
     mt_font *bold = mt_font_open_styled("Helvetica Neue", 64.0f, 1, 0);
     mt_font *ital = mt_font_open_styled("Helvetica Neue", 64.0f, 0, 1);
@@ -132,7 +131,7 @@ int main(void)
         SKIP("bold face unavailable");
     }
     if (ital) {
-        dump(ital, "Italic fy", ink, "out_italic.png");  /* overhang stress */
+        dump(ital, "Italic fy", ink, "out_italic.png"); // overhang stress
         mt_font_close(ital);
     } else {
         SKIP("italic face unavailable");
@@ -148,7 +147,7 @@ int main(void)
         free(ttf);
     }
 
-    /* shaped handle rendered into a caller-owned buffer */
+    // shaped handle rendered into a caller-owned buffer
     mt_shaped *sh = mt_shape(f, "Shaped 形状", -1, ink);
     if (sh) {
         int sw, shh;
@@ -163,17 +162,16 @@ int main(void)
         mt_shaped_free(sh);
     }
 
-    /* rich runs: several fonts and colors share one baseline */
+    // rich runs: several fonts and colors share one baseline
     {
         mt_font *rb = mt_font_open_styled("Helvetica Neue", 48.0f, 1, 0);
         mt_text *t = mt_text_new();
         mt_text_run(t, "Bold ", -1, rb, red, NULL);
         mt_text_run(t, "中文 ", -1, f, ink, NULL);
         mt_text_run(t, "regular runs.", -1, f, ink, NULL);
-        mt_block *b = mt_text_wrap(t, 0.0f);  /* one line */
+        mt_block *b = mt_text_wrap(t, 0.0f); // one line
         printf("%s  rich one line     %d line(s)\n",
-               CHECK(b && mt_block_lines(b) == 1),
-               b ? mt_block_lines(b) : -1);
+               CHECK(b && mt_block_lines(b) == 1), b ? mt_block_lines(b) : -1);
         if (b && mt_block_lines(b) >= 1) {
             int rw, rh;
             unsigned char *px =
@@ -188,7 +186,7 @@ int main(void)
         mt_font_close(rb);
     }
 
-    /* width wrap: one long paragraph broken into stacked lines */
+    // width wrap: one long paragraph broken into stacked lines
     {
         mt_text *t = mt_text_new();
         mt_text_run(t,
@@ -205,13 +203,15 @@ int main(void)
         mt_text_free(t);
     }
 
-    /* hard breaks: '\n' splits lines, a blank line keeps its height */
+    // hard breaks: '\n' splits lines, a blank line keeps its height
     {
         mt_text *t = mt_text_new();
         mt_text_run(t, "Line one\nLine two\n\nLine four", -1, f, ink, NULL);
-        mt_block *b = mt_text_wrap(t, 0.0f);  /* no width wrap, only hard breaks */
+        mt_block *b =
+            mt_text_wrap(t, 0.0f); // no width wrap, only hard breaks
         int n = b ? mt_block_lines(b) : 0;
-        float blank = n == 4 ? mt_shaped_metrics(mt_block_line(b, 2)).height : 0;
+        float blank =
+            n == 4 ? mt_shaped_metrics(mt_block_line(b, 2)).height : 0;
         printf("%s  hard breaks       %d lines, blank height=%.1f\n",
                CHECK(n == 4 && blank > 1), n, blank);
         if (n > 0) {
@@ -221,43 +221,46 @@ int main(void)
         mt_text_free(t);
     }
 
-    /* OpenType feature: smcp turns lowercase into small caps */
+    // OpenType feature: smcp turns lowercase into small caps
     {
         mt_font *bk = mt_font_open("Baskerville", 64.0f);
         if (!bk) {
             SKIP("Baskerville unavailable; smcp test skipped");
         } else {
-        const char *txt = "Small Caps";
-        int aw, ah, bw = 0, bh = 0;
-        unsigned char *a = mt_render(bk, txt, -1, ink, &aw, &ah, NULL);
-        mt_text *t = mt_text_new();
-        mt_text_run(t, txt, -1, bk, ink, "smcp");
-        mt_block *blk = mt_text_wrap(t, 0.0f);
-        unsigned char *bpx = NULL;
-        if (blk && mt_block_lines(blk) == 1) {
-            bpx = mt_shaped_render(mt_block_line(blk, 0), NULL, &bw, &bh, NULL);
-        }
-        int changed = a && bpx &&
-                      (aw != bw || ah != bh ||
-                       memcmp(a, bpx, (size_t)aw * ah * 4) != 0);
-        printf("%s  OT feature smcp   plain=%dx%d smcp=%dx%d %s\n",
-               CHECK(changed), aw, ah, bw, bh,
-               changed ? "(differs)" : "(no change)");
-        if (a) {
-            stbi_write_png(OUTDIR "/out_ot_plain.png", aw, ah, 4, a, aw * 4);
-        }
-        if (bpx) {
-            stbi_write_png(OUTDIR "/out_ot_smcp.png", bw, bh, 4, bpx, bw * 4);
-        }
-        mt_free(a);
-        mt_free(bpx);
-        mt_block_free(blk);
-        mt_text_free(t);
-        mt_font_close(bk);
+            const char *txt = "Small Caps";
+            int aw, ah, bw = 0, bh = 0;
+            unsigned char *a = mt_render(bk, txt, -1, ink, &aw, &ah, NULL);
+            mt_text *t = mt_text_new();
+            mt_text_run(t, txt, -1, bk, ink, "smcp");
+            mt_block *blk = mt_text_wrap(t, 0.0f);
+            unsigned char *bpx = NULL;
+            if (blk && mt_block_lines(blk) == 1) {
+                bpx = mt_shaped_render(mt_block_line(blk, 0), NULL, &bw, &bh,
+                                       NULL);
+            }
+            int changed = a && bpx &&
+                          (aw != bw || ah != bh ||
+                           memcmp(a, bpx, (size_t)aw * ah * 4) != 0);
+            printf("%s  OT feature smcp   plain=%dx%d smcp=%dx%d %s\n",
+                   CHECK(changed), aw, ah, bw, bh,
+                   changed ? "(differs)" : "(no change)");
+            if (a) {
+                stbi_write_png(OUTDIR "/out_ot_plain.png", aw, ah, 4, a,
+                               aw * 4);
+            }
+            if (bpx) {
+                stbi_write_png(OUTDIR "/out_ot_smcp.png", bw, bh, 4, bpx,
+                               bw * 4);
+            }
+            mt_free(a);
+            mt_free(bpx);
+            mt_block_free(blk);
+            mt_text_free(t);
+            mt_font_close(bk);
         }
     }
 
-    /* hit-testing: byte offset <-> caret x round-trips on a shaped line */
+    // hit-testing: byte offset <-> caret x round-trips on a shaped line
     {
         mt_shaped *s = mt_shape(f, "Hello", -1, ink);
         int ok = s != NULL;
@@ -275,7 +278,7 @@ int main(void)
         printf("%s  hit-test ascii    round-trip bytes 0..5\n", CHECK(ok));
     }
     {
-        /* "A" + U+00E9 (2 bytes, 1 u16) + U+1F600 (4 bytes, 2 u16) + "B" */
+        // "A" + U+00E9 (2 bytes, 1 u16) + U+1F600 (4 bytes, 2 u16) + "B"
         const char *txt = "Aé\U0001F600B";
         ptrdiff_t bound[] = { 0, 1, 3, 7, 8 };
         mt_shaped *s = mt_shape(f, txt, -1, ink);
@@ -293,7 +296,7 @@ int main(void)
                CHECK(ok));
     }
     {
-        /* block lines carry line-relative offsets */
+        // block lines carry line-relative offsets
         mt_text *t = mt_text_new();
         mt_text_run(t, "alpha beta gamma delta epsilon zeta eta theta", -1, f,
                     ink, NULL);
@@ -311,7 +314,7 @@ int main(void)
         mt_text_free(t);
     }
 
-    /* alignment: left/right/center shift align_dx; justify fills the width */
+    // alignment: left/right/center shift align_dx; justify fills the width
     {
         const char *para =
             "The quick brown fox jumps over the lazy dog and keeps running";
@@ -364,13 +367,14 @@ int main(void)
             float w0 = mt_shaped_metrics(mt_block_line(b, 0)).width;
             ok = w0 > wbox - 6.0f && w0 <= wbox + 2.0f;
         }
-        printf("%s  align justify     line0 width %.0f -> box %.0f\n", CHECK(ok),
+        printf("%s  align justify     line0 width %.0f -> box %.0f\n",
+               CHECK(ok),
                ok ? mt_shaped_metrics(mt_block_line(b, 0)).width : 0.0f, wbox);
         mt_block_free(b);
         mt_text_free(t);
     }
     {
-        /* line-height multiplies the baseline-to-baseline distance */
+        // line-height multiplies the baseline-to-baseline distance
         mt_text *t1 = mt_text_new();
         mt_text_run(t1, "one\ntwo", -1, f, ink, NULL);
         mt_block *b1 = mt_text_wrap(t1, 0.0f);
@@ -392,7 +396,7 @@ int main(void)
         mt_text_free(t2);
     }
     {
-        /* font metrics without shaping agree with a shaped line */
+        // font metrics without shaping agree with a shaped line
         mt_metrics fm = mt_font_metrics(f);
         mt_metrics sm = mt_measure(f, "Mg", -1);
         int ok = fm.height > 0 && NEAR(fm.ascent, sm.ascent, 0.01f) &&
@@ -402,7 +406,8 @@ int main(void)
     }
     {
         /* block geometry: line_at_y inverts the stacking, source spans
-           partition the text, height totals the stack, selection covers a line */
+           partition the text, height totals the stack, selection covers a line
+         */
         const char *para = "alpha beta gamma delta epsilon zeta eta theta iota";
         mt_text *t = mt_text_new();
         mt_text_run(t, para, -1, f, ink, NULL);
@@ -438,13 +443,14 @@ int main(void)
             float w0 = mt_shaped_metrics(mt_block_line(b, 0)).width;
             ok = sn >= 1 && sp[0] < 1.0f && sp[sn * 2 - 1] > w0 - 30.0f;
         }
-        printf("%s  block geometry    %d lines, y+source+selection round-trip\n",
-               CHECK(ok), n);
+        printf(
+            "%s  block geometry    %d lines, y+source+selection round-trip\n",
+            CHECK(ok), n);
         mt_block_free(b);
         mt_text_free(t);
     }
     {
-        /* a bidi line splits one logical range into disjoint visual spans */
+        // a bidi line splits one logical range into disjoint visual spans
         mt_text *t = mt_text_new();
         mt_text_run(t, "abc \xD7\x90\xD7\x91\xD7\x92 xyz", -1, f, ink, NULL);
         mt_block *b = mt_text_wrap(t, 0.0f);
@@ -456,20 +462,21 @@ int main(void)
             int sn = mt_shaped_selection(mt_block_line(b, 0), 0, llen, sp, 8);
             ok = sn >= 1;
             for (int i = 0; ok && i < sn; i++) {
-                if (sp[i * 2] > sp[i * 2 + 1]) {  /* each span is ordered */
+                if (sp[i * 2] > sp[i * 2 + 1]) { // each span is ordered
                     ok = 0;
                 }
             }
         }
-        printf("%s  bidi selection    spans ordered on a mixed line\n", CHECK(ok));
+        printf("%s  bidi selection    spans ordered on a mixed line\n",
+               CHECK(ok));
         mt_block_free(b);
         mt_text_free(t);
     }
     {
-        /* RTL line: logical index 0 sits at the right, so caret x descends */
+        // RTL line: logical index 0 sits at the right, so caret x descends
         mt_shaped *r = mt_shape(
             f, "\xD8\xA7\xD9\x84\xD8\xB9\xD8\xB1\xD8\xA8\xD9\x8A\xD8\xA9", -1,
-            ink);  /* العربية, 14 bytes */
+            ink); // العربية, 14 bytes
         int ok = r != NULL;
         if (r) {
             ok = mt_shaped_caret_x(r, 0) > mt_shaped_caret_x(r, 14) + 1.0f;
@@ -478,7 +485,8 @@ int main(void)
         printf("%s  rtl caret order   start right of end\n", CHECK(ok));
     }
     {
-        /* byte_at_x is the exact inverse of caret_x, and caret x is monotonic */
+        /* byte_at_x is the exact inverse of caret_x, and caret x is monotonic
+         */
         const char *s8 = "Hello world";
         int len = (int)strlen(s8);
         mt_shaped *s = mt_shape(f, s8, -1, ink);
@@ -495,7 +503,7 @@ int main(void)
         mt_shaped_free(s);
     }
     {
-        /* an empty run still carries the font's height in its bitmap */
+        // an empty run still carries the font's height in its bitmap
         mt_shaped *e = mt_shape(f, "", 0, ink);
         int ok = e != NULL;
         if (e) {
@@ -507,7 +515,7 @@ int main(void)
         }
         printf("%s  empty line height ascent+descent fallback\n", CHECK(ok));
     }
-    /* error channel */
+    // error channel
     int w, h;
     int pass = 1;
     if (mt_render(f, NULL, -1, ink, &w, &h, NULL) != NULL ||
@@ -525,14 +533,14 @@ int main(void)
     }
     printf("%s  error channel (TEXT/TEXT/FONT distinguished)\n", CHECK(pass));
     {
-        /* malformed UTF-8 is rejected with MT_ERR_TEXT, not shaped */
+        // malformed UTF-8 is rejected with MT_ERR_TEXT, not shaped
         static const char *const malformed[] = {
-            "\x80",                  /* lone continuation byte */
-            "\xC3",                  /* truncated 2-byte sequence */
-            "\xE4\xB8",              /* truncated 3-byte sequence */
-            "\xC0\x80",              /* overlong encoding */
-            "\xED\xA0\x80",          /* lone surrogate U+D800 */
-            "\xF8\x88\x80\x80\x80",  /* 5-byte sequence */
+            "\x80",                 // lone continuation byte
+            "\xC3",                 // truncated 2-byte sequence
+            "\xE4\xB8",             // truncated 3-byte sequence
+            "\xC0\x80",             // overlong encoding
+            "\xED\xA0\x80",         // lone surrogate U+D800
+            "\xF8\x88\x80\x80\x80", // 5-byte sequence
         };
         int bad_ok = 1;
         size_t cases = sizeof(malformed) / sizeof(malformed[0]);

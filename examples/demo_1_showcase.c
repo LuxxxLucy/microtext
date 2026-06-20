@@ -11,13 +11,13 @@
 
 #define W 1040
 #define H 812
-#define CAP_X 48   /* caption column */
-#define SAMP_X 300 /* sample column */
+#define CAP_X 48   // caption column
+#define SAMP_X 300 // sample column
 #define OUT_PNG "output/showcase.png"
 
-static unsigned char *cv; /* W*H opaque RGBA canvas */
+static unsigned char *cv; // W*H opaque RGBA canvas
 
-/* Composite a straight-alpha RGBA bitmap onto the opaque canvas at (x, y). */
+// Composite a straight-alpha RGBA bitmap onto the opaque canvas at (x, y).
 static void over(int x, int y, const unsigned char *src, int sw, int sh)
 {
     for (int r = 0; r < sh; r++) {
@@ -34,14 +34,16 @@ static void over(int x, int y, const unsigned char *src, int sw, int sh)
             unsigned char *d = cv + ((size_t)cy * W + cx) * 4;
             unsigned a = s[3];
             for (int k = 0; k < 3; k++) {
-                d[k] = (unsigned char)((s[k] * a + d[k] * (255 - a) + 127) / 255);
+                d[k] =
+                    (unsigned char)((s[k] * a + d[k] * (255 - a) + 127) / 255);
             }
             d[3] = 255;
         }
     }
 }
 
-/* Draw one run with its baseline at (x, baseline). Returns the advance width. */
+/* Draw one run with its baseline at (x, baseline). Returns the advance width.
+ */
 static float run_base(const mt_font *f, const char *txt, mt_color col, int x,
                       int baseline)
 {
@@ -55,7 +57,7 @@ static float run_base(const mt_font *f, const char *txt, mt_color col, int x,
     return m.width;
 }
 
-/* Render one mt_shaped line with its baseline at (x, baseline). */
+// Render one mt_shaped line with its baseline at (x, baseline).
 static void line_base(const mt_shaped *ln, int x, int baseline)
 {
     int w, h;
@@ -94,7 +96,7 @@ int main(void)
     run_base(title, "microtext", ink, CAP_X, 92);
     run_base(body, "native text shaping in one header", sub, CAP_X, 140);
 
-    int b = 232; /* running baseline */
+    int b = 232; // running baseline
     const int step = 62;
 
     run_base(cap, "mixed scripts, fallback", gray, CAP_X, b);
@@ -110,12 +112,13 @@ int main(void)
     b += step;
 
     run_base(cap, "color emoji", gray, CAP_X, b);
-    run_base(body, "\U0001F3B5 \U0001F525 \U0001F30D \U0001F600 \U0001F44D "
-                   "\U0001F3B8 ✨",
+    run_base(body,
+             "\U0001F3B5 \U0001F525 \U0001F30D \U0001F600 \U0001F44D "
+             "\U0001F3B8 ✨",
              ink, SAMP_X, b);
     b += step;
 
-    /* rich runs: several fonts and colors on one baseline */
+    // rich runs: several fonts and colors on one baseline
     run_base(cap, "rich runs", gray, CAP_X, b);
     {
         mt_text *t = mt_text_new();
@@ -132,7 +135,7 @@ int main(void)
     }
     b += step;
 
-    /* OpenType: plain face beside the same word with small caps */
+    // OpenType: plain face beside the same word with small caps
     run_base(cap, "OpenType smcp", gray, CAP_X, b);
     {
         float adv = run_base(serif, "Quantum", ink, SAMP_X, b);
@@ -148,7 +151,7 @@ int main(void)
     }
     b += step;
 
-    /* wrapped paragraph with a hard break and mixed scripts */
+    // wrapped paragraph with a hard break and mixed scripts
     run_base(cap, "wrap + hard breaks", gray, CAP_X, b);
     {
         mt_text *t = mt_text_new();

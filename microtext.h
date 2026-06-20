@@ -14,7 +14,7 @@
  *   int w, h; mt_metrics m;
  *   unsigned char *rgba = mt_render(f, "Hello 你好 \U0001F3B5", -1,
  *                                   (mt_color){20, 20, 20, 255}, &w, &h, &m);
- *   // ... upload rgba (w*h, 8-bit sRGB RGBA, straight alpha, top row first) ...
+ *   // upload rgba: w*h, 8-bit sRGB RGBA, straight alpha, top row first
  *   mt_free(rgba);
  *   mt_font_close(f);
  *
@@ -33,11 +33,11 @@
 #ifndef MICROTEXT_H
 #define MICROTEXT_H
 
-#include <stddef.h>  /* ptrdiff_t */
+#include <stddef.h>  // ptrdiff_t
 
-/* Compile-time feature level, for `#if MICROTEXT_VERSION >= N` checks. The public
- * surface only grows: new functions and appended struct fields, never a signature
- * change, so a higher value is a strict superset of a lower one. */
+/* Compile-time feature level, for `#if MICROTEXT_VERSION >= N` checks. The
+ * public surface only grows: new functions and appended struct fields, never a
+ * signature change, so a higher value is a strict superset of a lower one. */
 #define MICROTEXT_VERSION 4
 
 /* Linkage of the public functions, stb-style. The default is external linkage.
@@ -85,10 +85,10 @@ typedef struct {
 
 typedef enum {
     MT_OK = 0,
-    MT_ERR_FONT,    /* font handle NULL, or the family/data did not resolve */
-    MT_ERR_TEXT,    /* text NULL or not valid UTF-8 */
-    MT_ERR_OOM,     /* out of memory */
-    MT_ERR_BACKEND  /* the platform text engine refused the request */
+    MT_ERR_FONT,    // font handle NULL, or the family/data did not resolve
+    MT_ERR_TEXT,    // text NULL or not valid UTF-8
+    MT_ERR_OOM,     // out of memory
+    MT_ERR_BACKEND  // the platform text engine refused the request
 } mt_error;
 
 /* The error from the last microtext call. Process-global, not per-thread (see
@@ -100,11 +100,12 @@ MICROTEXTDEF mt_error mt_last_error(void);
 MICROTEXTDEF mt_font *mt_font_open(const char *family, float pixel_size);
 /* Same, selecting a bold and/or italic style. A requested style the family
  * lacks falls back to the regular face. */
-MICROTEXTDEF mt_font *mt_font_open_styled(const char *family, float pixel_size, int bold,
-                             int italic);
+MICROTEXTDEF mt_font *mt_font_open_styled(const char *family, float pixel_size,
+                                          int bold, int italic);
 /* Open a font from an in-memory .ttf/.otf, so an app can ship its own. The
  * bytes are copied; the caller may free them after the call. */
-MICROTEXTDEF mt_font *mt_font_open_memory(const void *data, size_t len, float pixel_size);
+MICROTEXTDEF mt_font *mt_font_open_memory(const void *data, size_t len,
+                                          float pixel_size);
 MICROTEXTDEF void mt_font_close(mt_font *f);
 
 /* The font's own vertical metrics (ascent, descent, leading, height) without
@@ -117,8 +118,9 @@ MICROTEXTDEF mt_metrics mt_font_metrics(const mt_font *f);
  * pen y by mt_metrics.height per line. An empty run yields a minimal
  * transparent bitmap with metrics width 0. len < 0 means NUL-terminated. */
 
-/* Measure a UTF-8 run without rendering. origin_x/origin_y are left zero. */
-MICROTEXTDEF mt_metrics mt_measure(const mt_font *f, const char *utf8, ptrdiff_t len);
+// Measure a UTF-8 run without rendering. origin_x/origin_y are left zero.
+MICROTEXTDEF mt_metrics mt_measure(const mt_font *f, const char *utf8,
+                                   ptrdiff_t len);
 
 /* Render a UTF-8 run to a freshly allocated bitmap of 8-bit sRGB RGBA, straight
  * alpha, top row first, sized to the glyph ink. Fills *out_w, *out_h, and
@@ -128,9 +130,9 @@ MICROTEXTDEF mt_metrics mt_measure(const mt_font *f, const char *utf8, ptrdiff_t
  * The conversion from premultiplied alpha loses color precision at very low
  * alpha. pixel_size is in physical pixels: on a 2x display, open the font at
  * the logical size times the backing scale and draw one texel per pixel. */
-MICROTEXTDEF unsigned char *mt_render(const mt_font *f, const char *utf8, ptrdiff_t len,
-                         mt_color color, int *out_w, int *out_h,
-                         mt_metrics *out_m);
+MICROTEXTDEF unsigned char *mt_render(const mt_font *f, const char *utf8,
+                                      ptrdiff_t len, mt_color color, int *out_w,
+                                      int *out_h, mt_metrics *out_m);
 
 MICROTEXTDEF void mt_free(void *bitmap);
 
@@ -138,24 +140,26 @@ MICROTEXTDEF void mt_free(void *bitmap);
  * does not pay the shaping cost twice, and an atlas builder can render into a
  * buffer it owns. color is baked in at shape time. */
 typedef struct mt_shaped mt_shaped;
-MICROTEXTDEF mt_shaped *mt_shape(const mt_font *f, const char *utf8, ptrdiff_t len,
-                    mt_color color);
-/* Metrics including the pen origin and the bitmap size mt_shaped_render uses. */
+MICROTEXTDEF mt_shaped *mt_shape(const mt_font *f, const char *utf8,
+                                 ptrdiff_t len, mt_color color);
+/* Metrics including the pen origin and the bitmap size mt_shaped_render uses.
+ */
 MICROTEXTDEF mt_metrics mt_shaped_metrics(const mt_shaped *s);
 MICROTEXTDEF void mt_shaped_size(const mt_shaped *s, int *w, int *h);
 /* Render the shaped run. If dst is non-NULL it must hold w*h*4 bytes for the
  * size from mt_shaped_size, with row stride w*4; otherwise a buffer is
  * allocated. Returns the buffer (dst when given) or NULL. */
-MICROTEXTDEF unsigned char *mt_shaped_render(const mt_shaped *s, unsigned char *dst,
-                                int *out_w, int *out_h, mt_metrics *out_m);
+MICROTEXTDEF unsigned char *mt_shaped_render(const mt_shaped *s,
+                                             unsigned char *dst, int *out_w,
+                                             int *out_h, mt_metrics *out_m);
 MICROTEXTDEF void mt_shaped_free(mt_shaped *s);
 
 /* Hit-testing on a shaped line. Both calls work against this line's own text:
- * the whole run for mt_shape, or the line's bytes for an mt_block line. The x is
- * the line's own axis, measured from its pen origin (0 at the start pen, growing
- * to mt_metrics.width), the same axis as the advance. It does NOT include
- * mt_metrics.align_dx: a right/center/justified line is drawn at pen_x +
- * align_dx, so pass (screen_x - pen_x - align_dx) to mt_shaped_byte_at_x and
+ * the whole run for mt_shape, or the line's bytes for an mt_block line. The x
+ * is the line's own axis, measured from its pen origin (0 at the start pen,
+ * growing to mt_metrics.width), the same axis as the advance. It does NOT
+ * include mt_metrics.align_dx: a right/center/justified line is drawn at pen_x
+ * + align_dx, so pass (screen_x - pen_x - align_dx) to mt_shaped_byte_at_x and
  * draw the caret at pen_x + align_dx + mt_shaped_caret_x(...).
  *
  * mt_shaped_caret_x returns the caret x for a byte offset into the line's text
@@ -173,8 +177,8 @@ MICROTEXTDEF ptrdiff_t mt_shaped_byte_at_x(const mt_shaped *s, float x);
  * splits one logical range into several disjoint spans; an LTR range is one
  * span. Each x is on the line's own axis (the mt_shaped_caret_x axis), so it
  * excludes mt_metrics.align_dx. */
-MICROTEXTDEF int mt_shaped_selection(const mt_shaped *s, ptrdiff_t a, ptrdiff_t b,
-                                     float *out, int max_pairs);
+MICROTEXTDEF int mt_shaped_selection(const mt_shaped *s, ptrdiff_t a,
+                                     ptrdiff_t b, float *out, int max_pairs);
 
 /* Rich, multi-run text and width-based line wrapping.
  *
@@ -188,27 +192,31 @@ typedef struct mt_text mt_text;
 typedef struct mt_block mt_block;
 
 typedef enum {
-    MT_ALIGN_LEFT = 0,  /* the default */
+    MT_ALIGN_LEFT = 0,  // the default
     MT_ALIGN_RIGHT,
     MT_ALIGN_CENTER,
-    MT_ALIGN_JUSTIFY    /* fill the width; the last line of a paragraph stays ragged */
+    MT_ALIGN_JUSTIFY /* fill the width; the last line of a paragraph stays
+                        ragged */
 } mt_align;
 
-/* Start an empty paragraph. Free with mt_text_free. Returns NULL on OOM. */
+// Start an empty paragraph. Free with mt_text_free. Returns NULL on OOM.
 MICROTEXTDEF mt_text *mt_text_new(void);
 /* Append a styled run. features is a space-separated list of OpenType feature
  * tags to enable (e.g. "smcp tnum frac"), or NULL for none. Returns 0 on
  * success, -1 on failure (see mt_last_error). len < 0 means NUL-terminated. */
-MICROTEXTDEF int mt_text_run(mt_text *t, const char *utf8, ptrdiff_t len, const mt_font *f,
-                mt_color color, const char *features);
+MICROTEXTDEF int mt_text_run(mt_text *t, const char *utf8, ptrdiff_t len,
+                             const mt_font *f, mt_color color,
+                             const char *features);
 
 /* Paragraph alignment for the whole text; takes effect at wrap time and needs a
- * positive wrap width. Left/right/center shift each line via mt_metrics.align_dx;
- * justify stretches the line to the width (last line of a paragraph excepted). */
+ * positive wrap width. Left/right/center shift each line via
+ * mt_metrics.align_dx; justify stretches the line to the width (last line of a
+ * paragraph excepted). */
 MICROTEXTDEF void mt_text_align(mt_text *t, mt_align align);
 /* Multiply the baseline-to-baseline distance (mt_metrics.height) of every line.
  * The multiplier is taken literally for any value > 0: 1.5 is one-and-a-half
- * spacing, and a value below 1.0 tightens leading and may overlap lines. A value
+ * spacing, and a value below 1.0 tightens leading and may overlap lines. A
+ * value
  * <= 0 means the font's natural spacing. */
 MICROTEXTDEF void mt_text_line_height(mt_text *t, float multiple);
 
@@ -235,8 +243,10 @@ MICROTEXTDEF int mt_block_line_at_y(const mt_block *b, float y);
 
 /* Byte span of line i within the text's UTF-8 (the concatenation of the run
  * bytes). Returns the start byte offset and, via out_len (may be NULL), the
- * length, so a line-relative hit-test offset maps back to a document position. */
-MICROTEXTDEF ptrdiff_t mt_block_line_source(const mt_block *b, int i, ptrdiff_t *out_len);
+ * length, so a line-relative hit-test offset maps back to a document position.
+ */
+MICROTEXTDEF ptrdiff_t mt_block_line_source(const mt_block *b, int i,
+                                            ptrdiff_t *out_len);
 
 MICROTEXTDEF void mt_block_free(mt_block *b);
 
@@ -244,9 +254,9 @@ MICROTEXTDEF void mt_block_free(mt_block *b);
 }
 #endif
 
-#endif /* MICROTEXT_H */
+#endif  // MICROTEXT_H
 
-/* ------------------------------------------------------------------------- */
+// -------------------------------------------------------------------------
 
 #ifdef MICROTEXT_IMPLEMENTATION
 #ifndef MICROTEXT_IMPLEMENTATION_ONCE
@@ -258,19 +268,22 @@ MICROTEXTDEF void mt_block_free(mt_block *b);
 
 /* Allocator hooks. Define all three (or none) before including the
  * implementation to route every internal allocation through your own. */
-#if defined(MICROTEXT_MALLOC) && defined(MICROTEXT_REALLOC) && defined(MICROTEXT_FREE)
-/* the consumer supplied all three */
-#elif !defined(MICROTEXT_MALLOC) && !defined(MICROTEXT_REALLOC) && !defined(MICROTEXT_FREE)
-#define MICROTEXT_MALLOC(sz)     malloc(sz)
+#if defined(MICROTEXT_MALLOC) && defined(MICROTEXT_REALLOC) && \
+    defined(MICROTEXT_FREE)
+// the consumer supplied all three
+#elif !defined(MICROTEXT_MALLOC) && !defined(MICROTEXT_REALLOC) && \
+    !defined(MICROTEXT_FREE)
+#define MICROTEXT_MALLOC(sz) malloc(sz)
 #define MICROTEXT_REALLOC(p, sz) realloc(p, sz)
-#define MICROTEXT_FREE(p)        free(p)
+#define MICROTEXT_FREE(p) free(p)
 #else
-#error "microtext: define all of MICROTEXT_MALLOC, MICROTEXT_REALLOC, MICROTEXT_FREE, or none"
+#error \
+    "microtext: define all of MICROTEXT_MALLOC, MICROTEXT_REALLOC, MICROTEXT_FREE, or none"
 #endif
 
-/* Backend-neutral UTF-8 / UTF-16 index math, shared by any backend. */
+// Backend-neutral UTF-8 / UTF-16 index math, shared by any backend.
 
-/* Byte length of the UTF-8 sequence whose lead byte is c (1..4). */
+// Byte length of the UTF-8 sequence whose lead byte is c (1..4).
 static int mt_utf8_seqlen(unsigned char c)
 {
     return c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
@@ -290,7 +303,7 @@ static ptrdiff_t mt_u16_count(const char *t, int nbytes, ptrdiff_t byteoff)
     for (ptrdiff_t i = 0; i < byteoff;) {
         int len = mt_utf8_seqlen((unsigned char)t[i]);
         if (i + len > byteoff) {
-            break;  /* partial sequence: stop on the boundary */
+            break;  // partial sequence: stop on the boundary
         }
         u += len == 4 ? 2 : 1;
         i += len;
@@ -298,7 +311,7 @@ static ptrdiff_t mt_u16_count(const char *t, int nbytes, ptrdiff_t byteoff)
     return u;
 }
 
-/* Inverse: the byte offset reached after u16 UTF-16 code units of t. */
+// Inverse: the byte offset reached after u16 UTF-16 code units of t.
 static ptrdiff_t mt_u16_to_byte(const char *t, int nbytes, ptrdiff_t u16)
 {
     ptrdiff_t u = 0;
@@ -341,7 +354,7 @@ static CGColorSpaceRef mt_srgb(void)
     return space;
 }
 
-/* Take ownership of ct and box it; releases ct on allocation failure. */
+// Take ownership of ct and box it; releases ct on allocation failure.
 static mt_font *mt_wrap(CTFontRef ct)
 {
     if (!ct) {
@@ -359,13 +372,13 @@ static mt_font *mt_wrap(CTFontRef ct)
     return f;
 }
 
-MICROTEXTDEF mt_font *mt_font_open_styled(const char *family, float pixel_size, int bold,
-                             int italic)
+MICROTEXTDEF mt_font *mt_font_open_styled(const char *family, float pixel_size,
+                                          int bold, int italic)
 {
     CTFontRef base = NULL;
     if (family) {
-        CFStringRef name = CFStringCreateWithCString(NULL, family,
-                                                     kCFStringEncodingUTF8);
+        CFStringRef name =
+            CFStringCreateWithCString(NULL, family, kCFStringEncodingUTF8);
         if (name) {
             base = CTFontCreateWithName(name, pixel_size, NULL);
             CFRelease(name);
@@ -388,9 +401,9 @@ MICROTEXTDEF mt_font *mt_font_open_styled(const char *family, float pixel_size, 
         mask |= kCTFontItalicTrait;
     }
     if (mask) {
-        CTFontRef styled = CTFontCreateCopyWithSymbolicTraits(base, pixel_size,
-                                                              NULL, traits, mask);
-        if (styled) {  /* a missing style keeps the regular face */
+        CTFontRef styled = CTFontCreateCopyWithSymbolicTraits(
+            base, pixel_size, NULL, traits, mask);
+        if (styled) {  // a missing style keeps the regular face
             CFRelease(base);
             base = styled;
         }
@@ -403,7 +416,8 @@ MICROTEXTDEF mt_font *mt_font_open(const char *family, float pixel_size)
     return mt_font_open_styled(family, pixel_size, 0, 0);
 }
 
-MICROTEXTDEF mt_font *mt_font_open_memory(const void *data, size_t len, float pixel_size)
+MICROTEXTDEF mt_font *mt_font_open_memory(const void *data, size_t len,
+                                          float pixel_size)
 {
     if (!data || !len) {
         mt_err = MT_ERR_FONT;
@@ -506,12 +520,12 @@ static CTLineRef mt_line(const mt_font *f, const char *utf8, ptrdiff_t len,
 
 struct mt_shaped {
     CTLineRef line;
-    mt_metrics m;     /* origin filled; m.width is the advance */
-    int w, h;         /* bitmap size */
-    double pen_x, pen_y;  /* text position that lands the ink in the bitmap */
-    char *txt;        /* this line's UTF-8 bytes, for byte<->index queries */
+    mt_metrics m;         // origin filled; m.width is the advance
+    int w, h;             // bitmap size
+    double pen_x, pen_y;  // text position that lands the ink in the bitmap
+    char *txt;            // this line's UTF-8 bytes, for byte<->index queries
     int nbytes;
-    CFIndex u16_base; /* UTF-16 index of this line's start in its source string */
+    CFIndex u16_base;  // UTF-16 index of this line's start in its source string
 };
 
 /* Box a CTLine into mt_shaped, taking ownership of line and adopting txt (a
@@ -534,8 +548,8 @@ static mt_shaped *mt_shaped_from_line(CTLineRef line, char *txt, int nbytes,
     s->u16_base = u16_base;
     s->line = line;
     CGFloat ascent = 0, descent = 0, leading = 0;
-    double advance = CTLineGetTypographicBounds(line, &ascent, &descent,
-                                                &leading);
+    double advance =
+        CTLineGetTypographicBounds(line, &ascent, &descent, &leading);
     /* Size to the ink, not the advance, so overhang does not clip. Text-space
      * box [x0,x1] x [y0,y1], y up, origin at the pen baseline. */
     CGRect ink = CTLineGetImageBounds(line, NULL);
@@ -566,8 +580,8 @@ static mt_shaped *mt_shaped_from_line(CTLineRef line, char *txt, int nbytes,
     return s;
 }
 
-MICROTEXTDEF mt_shaped *mt_shape(const mt_font *f, const char *utf8, ptrdiff_t len,
-                    mt_color color)
+MICROTEXTDEF mt_shaped *mt_shape(const mt_font *f, const char *utf8,
+                                 ptrdiff_t len, mt_color color)
 {
     if (!f) {
         mt_err = MT_ERR_FONT;
@@ -609,8 +623,9 @@ MICROTEXTDEF void mt_shaped_size(const mt_shaped *s, int *w, int *h)
     }
 }
 
-MICROTEXTDEF unsigned char *mt_shaped_render(const mt_shaped *s, unsigned char *dst,
-                                int *out_w, int *out_h, mt_metrics *out_m)
+MICROTEXTDEF unsigned char *mt_shaped_render(const mt_shaped *s,
+                                             unsigned char *dst, int *out_w,
+                                             int *out_h, mt_metrics *out_m)
 {
     if (!s) {
         mt_err = MT_ERR_FONT;
@@ -628,9 +643,8 @@ MICROTEXTDEF unsigned char *mt_shaped_render(const mt_shaped *s, unsigned char *
         }
         memset(buf, 0, (size_t)w * h * 4);
     }
-    CGContextRef ctx = CGBitmapContextCreate(buf, w, h, 8, (size_t)w * 4,
-                                             mt_srgb(),
-                                             kCGImageAlphaPremultipliedLast);
+    CGContextRef ctx = CGBitmapContextCreate(
+        buf, w, h, 8, (size_t)w * 4, mt_srgb(), kCGImageAlphaPremultipliedLast);
     if (!ctx) {
         if (!dst) {
             MICROTEXT_FREE(buf);
@@ -642,7 +656,7 @@ MICROTEXTDEF unsigned char *mt_shaped_render(const mt_shaped *s, unsigned char *
     CTLineDraw(s->line, ctx);
     CGContextRelease(ctx);
 
-    /* CoreGraphics stores premultiplied alpha; convert to straight. */
+    // CoreGraphics stores premultiplied alpha; convert to straight.
     for (size_t i = 0, px = (size_t)w * h; i < px; i++) {
         unsigned char a = buf[i * 4 + 3];
         if (a != 0 && a != 255) {
@@ -705,8 +719,8 @@ MICROTEXTDEF ptrdiff_t mt_shaped_byte_at_x(const mt_shaped *s, float x)
     return mt_u16_to_byte(s->txt, s->nbytes, rel);
 }
 
-MICROTEXTDEF int mt_shaped_selection(const mt_shaped *s, ptrdiff_t a, ptrdiff_t b,
-                                     float *out, int max_pairs)
+MICROTEXTDEF int mt_shaped_selection(const mt_shaped *s, ptrdiff_t a,
+                                     ptrdiff_t b, float *out, int max_pairs)
 {
     if (!s) {
         mt_err = MT_ERR_FONT;
@@ -738,13 +752,14 @@ MICROTEXTDEF int mt_shaped_selection(const mt_shaped *s, ptrdiff_t a, ptrdiff_t 
         CTRunRef run = (CTRunRef)CFArrayGetValueAtIndex(runs, r);
         CFRange rr = CTRunGetStringRange(run);
         CFIndex i0 = lo > rr.location ? lo : rr.location;
-        CFIndex i1 = hi < rr.location + rr.length ? hi : rr.location + rr.length;
+        CFIndex i1 =
+            hi < rr.location + rr.length ? hi : rr.location + rr.length;
         if (i0 >= i1) {
             continue;
         }
         CGFloat x0 = CTLineGetOffsetForStringIndex(s->line, i0, NULL);
         CGFloat x1 = CTLineGetOffsetForStringIndex(s->line, i1, NULL);
-        if (x1 < x0) {  /* RTL run: offsets descend with index */
+        if (x1 < x0) {  // RTL run: offsets descend with index
             CGFloat t = x0;
             x0 = x1;
             x1 = t;
@@ -756,7 +771,8 @@ MICROTEXTDEF int mt_shaped_selection(const mt_shaped *s, ptrdiff_t a, ptrdiff_t 
     return count;
 }
 
-MICROTEXTDEF mt_metrics mt_measure(const mt_font *f, const char *utf8, ptrdiff_t len)
+MICROTEXTDEF mt_metrics mt_measure(const mt_font *f, const char *utf8,
+                                   ptrdiff_t len)
 {
     mt_color black = { 0, 0, 0, 255 };
     mt_shaped *s = mt_shape(f, utf8, len, black);
@@ -773,9 +789,9 @@ MICROTEXTDEF mt_metrics mt_measure(const mt_font *f, const char *utf8, ptrdiff_t
     return m;
 }
 
-MICROTEXTDEF unsigned char *mt_render(const mt_font *f, const char *utf8, ptrdiff_t len,
-                         mt_color color, int *out_w, int *out_h,
-                         mt_metrics *out_m)
+MICROTEXTDEF unsigned char *mt_render(const mt_font *f, const char *utf8,
+                                      ptrdiff_t len, mt_color color, int *out_w,
+                                      int *out_h, mt_metrics *out_m)
 {
     mt_shaped *s = mt_shape(f, utf8, len, color);
     if (!s) {
@@ -857,7 +873,7 @@ static CTFontRef mt_font_with_features(CTFontRef base, const char *features)
 struct mt_text {
     CFMutableAttributedStringRef as;
     mt_align align;
-    float line_height;  /* 0 = the font's natural spacing */
+    float line_height;  // 0 = the font's natural spacing
 };
 
 MICROTEXTDEF mt_text *mt_text_new(void)
@@ -878,8 +894,9 @@ MICROTEXTDEF mt_text *mt_text_new(void)
     return t;
 }
 
-MICROTEXTDEF int mt_text_run(mt_text *t, const char *utf8, ptrdiff_t len, const mt_font *f,
-                mt_color color, const char *features)
+MICROTEXTDEF int mt_text_run(mt_text *t, const char *utf8, ptrdiff_t len,
+                             const mt_font *f, mt_color color,
+                             const char *features)
 {
     if (!t || !f) {
         mt_err = MT_ERR_FONT;
@@ -909,7 +926,8 @@ MICROTEXTDEF int mt_text_run(mt_text *t, const char *utf8, ptrdiff_t len, const 
             NULL, (const void **)keys, (const void **)vals, 2,
             &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
         if (attrs) {
-            CFAttributedStringRef run = CFAttributedStringCreate(NULL, s, attrs);
+            CFAttributedStringRef run =
+                CFAttributedStringCreate(NULL, s, attrs);
             if (run) {
                 CFIndex cur = CFAttributedStringGetLength(t->as);
                 CFAttributedStringReplaceAttributedString(
@@ -968,8 +986,8 @@ static char *mt_utf16_slice(const UniChar *u, CFIndex n, CFIndex *out_len)
         return NULL;
     }
     CFIndex blen = 0;
-    CFStringGetBytes(s, CFRangeMake(0, n), kCFStringEncodingUTF8, 0, false, NULL,
-                     0, &blen);
+    CFStringGetBytes(s, CFRangeMake(0, n), kCFStringEncodingUTF8, 0, false,
+                     NULL, 0, &blen);
     char *buf = (char *)MICROTEXT_MALLOC((size_t)blen + 1);
     if (buf) {
         CFStringGetBytes(s, CFRangeMake(0, n), kCFStringEncodingUTF8, 0, false,
@@ -986,7 +1004,7 @@ static char *mt_utf16_slice(const UniChar *u, CFIndex n, CFIndex *out_len)
 static int mt_break_len(const UniChar *c, CFIndex i, CFIndex total)
 {
     UniChar u = c[i];
-    if (u == 0x000D) {  /* CR, possibly CRLF */
+    if (u == 0x000D) {  // CR, possibly CRLF
         return (i + 1 < total && c[i + 1] == 0x000A) ? 2 : 1;
     }
     if (u == 0x000A || u == 0x000B || u == 0x000C || u == 0x0085 ||
@@ -1011,7 +1029,7 @@ MICROTEXTDEF mt_block *mt_text_wrap(const mt_text *t, float max_width)
     CFIndex total = CFAttributedStringGetLength(t->as);
     if (total == 0) {
         mt_err = MT_OK;
-        return b;  /* empty paragraph: zero lines */
+        return b;  // empty paragraph: zero lines
     }
     CTTypesetterRef ts = CTTypesetterCreateWithAttributedString(t->as);
     if (!ts) {
@@ -1020,7 +1038,8 @@ MICROTEXTDEF mt_block *mt_text_wrap(const mt_text *t, float max_width)
         return NULL;
     }
     CFStringRef str = CFAttributedStringGetString(t->as);
-    UniChar *chars = (UniChar *)MICROTEXT_MALLOC((size_t)total * sizeof(UniChar));
+    UniChar *chars =
+        (UniChar *)MICROTEXT_MALLOC((size_t)total * sizeof(UniChar));
     if (!chars) {
         CFRelease(ts);
         MICROTEXT_FREE(b);
@@ -1032,7 +1051,7 @@ MICROTEXTDEF mt_block *mt_text_wrap(const mt_text *t, float max_width)
     double width = max_width > 0 ? (double)max_width : 1e7;
     int cap = 0;
     for (CFIndex start = 0; start < total;) {
-        /* Span the current paragraph up to the next mandatory break. */
+        // Span the current paragraph up to the next mandatory break.
         CFIndex mb = start;
         int mblen = 0;
         while (mb < total) {
@@ -1044,14 +1063,14 @@ MICROTEXTDEF mt_block *mt_text_wrap(const mt_text *t, float max_width)
         }
         CFIndex count = CTTypesetterSuggestLineBreak(ts, start, width);
         CFIndex end;
-        int para_last;  /* this line ends its paragraph (not a width break) */
+        int para_last;  // this line ends its paragraph (not a width break)
         if (count <= 0 || start + count >= mb) {
             /* The paragraph's remainder fits; carry the break char into the
              * line so a blank line keeps the font's height. */
             end = mb < total ? mb + mblen : mb;
             para_last = 1;
         } else {
-            end = start + count;  /* width forces a break before the hard one */
+            end = start + count;  // width forces a break before the hard one
             para_last = 0;
         }
         CTLineRef line =
@@ -1061,7 +1080,8 @@ MICROTEXTDEF mt_block *mt_text_wrap(const mt_text *t, float max_width)
             goto fail;
         }
         if (t->align == MT_ALIGN_JUSTIFY && max_width > 0 && !para_last) {
-            CTLineRef j = CTLineCreateJustifiedLine(line, 1.0, (double)max_width);
+            CTLineRef j =
+                CTLineCreateJustifiedLine(line, 1.0, (double)max_width);
             if (j) {
                 CFRelease(line);
                 line = j;
@@ -1079,7 +1099,8 @@ MICROTEXTDEF mt_block *mt_text_wrap(const mt_text *t, float max_width)
             b->lines = nl;
             cap = ncap;
         }
-        /* This line's UTF-8 bytes, adopted by mt_shaped for byte<->index queries. */
+        /* This line's UTF-8 bytes, adopted by mt_shaped for byte<->index
+         * queries. */
         CFIndex blen = 0;
         char *slice = mt_utf16_slice(chars + start, end - start, &blen);
         if (!slice) {
@@ -1089,7 +1110,7 @@ MICROTEXTDEF mt_block *mt_text_wrap(const mt_text *t, float max_width)
         }
         mt_shaped *sh = mt_shaped_from_line(line, slice, (int)blen, start);
         if (!sh) {
-            goto fail;  /* mt_err set; line and slice released by helper */
+            goto fail;  // mt_err set; line and slice released by helper
         }
         if (t->line_height > 0) {
             sh->m.height *= t->line_height;
@@ -1159,7 +1180,8 @@ MICROTEXTDEF int mt_block_line_at_y(const mt_block *b, float y)
     return b->n - 1;
 }
 
-MICROTEXTDEF ptrdiff_t mt_block_line_source(const mt_block *b, int i, ptrdiff_t *out_len)
+MICROTEXTDEF ptrdiff_t mt_block_line_source(const mt_block *b, int i,
+                                            ptrdiff_t *out_len)
 {
     if (out_len) {
         *out_len = 0;
@@ -1192,8 +1214,9 @@ MICROTEXTDEF void mt_block_free(mt_block *b)
 MICROTEXTDEF void mt_free(void *bitmap) { MICROTEXT_FREE(bitmap); }
 
 #else
-#error "microtext: no backend for this platform yet. Only macOS (CoreText) is implemented; Windows (DirectWrite) and Linux (FreeType/HarfBuzz) are planned. See the Backends section of the README."
+#error \
+    "microtext: no backend for this platform yet. Only macOS (CoreText) is implemented; Windows (DirectWrite) and Linux (FreeType/HarfBuzz) are planned. See the Backends section of the README."
 #endif
 
-#endif /* MICROTEXT_IMPLEMENTATION_ONCE */
-#endif /* MICROTEXT_IMPLEMENTATION */
+#endif  // MICROTEXT_IMPLEMENTATION_ONCE
+#endif  // MICROTEXT_IMPLEMENTATION

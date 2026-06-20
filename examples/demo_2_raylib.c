@@ -1,13 +1,13 @@
-/* Render mixed-script, bidi, emoji, wrapped, and rich text with microtext. */
+// Render mixed-script, bidi, emoji, wrapped, and rich text with microtext.
 #define MICROTEXT_IMPLEMENTATION
 #define MT_RAYLIB_IMPLEMENTATION
 #include "mt_raylib.h"
 
 #include "raylib.h"
 
-#define MAX_LINES 32 /* per-paragraph line cap */
+#define MAX_LINES 32 // per-paragraph line cap
 
-/* A wrapped block baked to one texture per line, laid out once. */
+// A wrapped block baked to one texture per line, laid out once.
 typedef struct {
     Texture2D tex;
     int dx, dy;
@@ -69,7 +69,7 @@ int main(void)
     mt_color sub = { 120, 120, 132, 255 };
     mt_color red = { 200, 44, 44, 255 };
 
-    /* rich: several fonts, colors, and an OpenType feature on one line */
+    // rich: several fonts, colors, and an OpenType feature on one line
     mt_text *rt = mt_text_new();
     mt_text_run(rt, "rich runs: ", -1, body, sub, NULL);
     mt_text_run(rt, "bold ", -1, bold, ink, NULL);
@@ -80,7 +80,7 @@ int main(void)
     mt_block_free(rb);
     mt_text_free(rt);
 
-    /* wrapped paragraph with a hard break and mixed scripts */
+    // wrapped paragraph with a hard break and mixed scripts
     mt_text *pt = mt_text_new();
     mt_text_run(pt,
                 "microtext wraps this paragraph to a fixed width and obeys\n"

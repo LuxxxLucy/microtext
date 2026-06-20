@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
-/* per-pixel max-abs-diff allowed, to absorb sub-pixel anti-aliasing noise */
+// per-pixel max-abs-diff allowed, to absorb sub-pixel anti-aliasing noise
 #define TOL 16
 
 static int g_fails;
@@ -37,8 +37,10 @@ static void check(const char *name, unsigned char *px, int w, int h)
     int gw, gh, gn;
     unsigned char *g = stbi_load(path, &gw, &gh, &gn, 4);
     if (!g) {
-        printf("FAIL  %-10s no golden; run `MICROTEXT_UPDATE_GOLDEN=1 make golden`\n",
-               name);
+        printf(
+            "FAIL  %-10s no golden; run `MICROTEXT_UPDATE_GOLDEN=1 make "
+            "golden`\n",
+            name);
         g_fails++;
         return;
     }
@@ -65,7 +67,8 @@ int main(void)
 {
     static const gcase cases[] = {
         { "latin", "Helvetica Neue", 48.0f, "Hello, microtext" },
-        { "cjk", "Helvetica Neue", 48.0f, "\xE4\xB8\xAD\xE6\x96\x87 \xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E" },
+        { "cjk", "Helvetica Neue", 48.0f,
+          "\xE4\xB8\xAD\xE6\x96\x87 \xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E" },
         { "overhang", "Helvetica Neue", 48.0f, "Ягfيp" },
     };
     mt_color ink = { 20, 20, 20, 255 };
@@ -73,7 +76,8 @@ int main(void)
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
         mt_font *f = mt_font_open(cases[i].font, cases[i].px);
         if (!f) {
-            printf("SKIP  %-10s %s unavailable\n", cases[i].name, cases[i].font);
+            printf("SKIP  %-10s %s unavailable\n", cases[i].name,
+                   cases[i].font);
             continue;
         }
         int w, h;
