@@ -810,17 +810,26 @@ MICROTEXTDEF int mt_shaped_selection(const mt_shaped *s, ptrdiff_t a,
 MICROTEXTDEF mt_metrics mt_measure(const mt_font *f, const char *utf8,
                                    ptrdiff_t len)
 {
-    mt_color black = { 0, 0, 0, 255 };
-    mt_shaped *s = mt_shape(f, utf8, len, black);
     mt_metrics m;
     memset(&m, 0, sizeof(m));
-    if (!s) {
+    if (!f) {
+        mt_err = MT_ERR_FONT;
         return m;
     }
-    m = s->m;
-    m.origin_x = 0;
-    m.origin_y = 0;
-    mt_shaped_free(s);
+    mt_color black = { 0, 0, 0, 255 };
+    CTLineRef line = mt_line(f, utf8, len, black);
+    if (!line) {
+        return m;  // mt_err set by mt_line
+    }
+    CGFloat ascent = 0, descent = 0, leading = 0;
+    double advance =
+        CTLineGetTypographicBounds(line, &ascent, &descent, &leading);
+    m.width = (float)advance;
+    m.ascent = (float)ascent;
+    m.descent = (float)descent;
+    m.leading = (float)leading;
+    m.height = (float)(ascent + descent + leading);
+    CFRelease(line);
     mt_err = MT_OK;
     return m;
 }
