@@ -14,10 +14,14 @@ macOS only (CoreText); Windows and Linux backends are planned, see [Backends](#b
 
 Vendor it: drop `microtext.h` into your tree and `#define MICROTEXT_IMPLEMENTATION` in exactly one `.c` file. No build step, no submodule.
 
-![The raylib demo: Latin, CJK, Korean, Arabic and Hebrew, color emoji, multi-font runs, small caps, and a wrapped paragraph, all rendered by microtext](assets/demo.png)
+![Headless gallery: Latin, CJK, Korean, Arabic and Hebrew, color emoji, multi-font runs, small caps, and a wrapped paragraph, all rendered by microtext](doc/showcase.png)
 
-The `microtext + raylib` demo (`examples/demo_2_raylib.c`); every glyph is one microtext bitmap uploaded as a texture.
-A headless variant, `build/build.sh run-demo1`, writes the same gallery to `build/output/showcase.png` with no window.
+Every glyph is one microtext bitmap.
+`build/build.sh run-demo1` regenerates this headless gallery into `build/output/showcase.png`.
+
+![The same content live in a microtext + raylib window](doc/raylib_demo.png)
+
+The `microtext + raylib` demo (`examples/demo_2_raylib.c`) uploads each bitmap as a texture; `build/build.sh run-demo2` opens it.
 
 ## Usage
 
