@@ -165,7 +165,7 @@ make test       # render samples and check them (exits non-zero on failure)
 make sanitize   # the test under AddressSanitizer + UBSan
 make leaks      # the test under the macOS leaks tool
 make demo_1_showcase  # render every feature to output/showcase.png
-make demo_2_raylib    # the interactive raylib demo (needs brew raylib)
+make demo_2_raylib    # build the interactive raylib demo (needs brew raylib); run ./examples/demo_2_raylib
 ```
 
 ## Configuration

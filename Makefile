@@ -49,8 +49,9 @@ demo_1_showcase: examples/demo_1_showcase
 examples/demo_1_showcase: examples/demo_1_showcase.c microtext.h tests/3rd/stb_image_write.h
 	$(CC) $(CFLAGS) $< -o $@ $(MAC_FW)
 
+# Build only; the demo opens a blocking window. Run it yourself:
+# ./examples/demo_2_raylib
 demo_2_raylib: examples/demo_2_raylib
-	./examples/demo_2_raylib
 examples/demo_2_raylib: examples/demo_2_raylib.c examples/mt_raylib.h microtext.h
 	$(CC) $(CFLAGS) $< -o $@ $(RL_FLAGS) $(MAC_FW) $(RL_FW)
 
