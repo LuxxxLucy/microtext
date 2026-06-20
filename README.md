@@ -14,9 +14,10 @@ macOS only (CoreText); Windows and Linux backends are planned, see [Backends](#b
 
 Vendor it: drop `microtext.h` into your tree and `#define MICROTEXT_IMPLEMENTATION` in exactly one `.c` file. No build step, no submodule.
 
-![Latin, CJK, Korean, Arabic and Hebrew, color emoji, multi-font runs, small caps, and a wrapped paragraph, all rendered by microtext](docs/showcase.png)
+![The raylib demo: Latin, CJK, Korean, Arabic and Hebrew, color emoji, multi-font runs, small caps, and a wrapped paragraph, all rendered by microtext](assets/demo.png)
 
-Every glyph above is one microtext bitmap; `make demo_1_showcase` regenerates it into `output/showcase.png`.
+The `microtext + raylib` demo (`examples/demo_2_raylib.c`); every glyph is one microtext bitmap uploaded as a texture.
+A headless variant, `make demo_1_showcase`, writes the same gallery to `output/showcase.png` with no window.
 
 ## Usage
 
