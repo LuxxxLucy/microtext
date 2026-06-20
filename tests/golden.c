@@ -38,8 +38,8 @@ static void check(const char *name, unsigned char *px, int w, int h)
     unsigned char *g = stbi_load(path, &gw, &gh, &gn, 4);
     if (!g) {
         printf(
-            "FAIL  %-10s no golden; run `MICROTEXT_UPDATE_GOLDEN=1 make "
-            "golden`\n",
+            "FAIL  %-10s no golden; run `MICROTEXT_UPDATE_GOLDEN=1 "
+            "build/build.sh golden`\n",
             name);
         g_fails++;
         return;
