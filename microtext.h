@@ -38,7 +38,7 @@
 /* Compile-time feature level, for `#if MICROTEXT_VERSION >= N` checks. The
  * public surface only grows: new functions and appended struct fields, never a
  * signature change, so a higher value is a strict superset of a lower one. */
-#define MICROTEXT_VERSION 4
+#define MICROTEXT_VERSION 5
 
 /* Linkage of the public functions, stb-style. The default is external linkage.
  * Define MICROTEXT_STATIC before including to fold the implementation privately
@@ -85,15 +85,19 @@ typedef struct {
 
 typedef enum {
     MT_OK = 0,
-    MT_ERR_FONT,    // font handle NULL, or the family/data did not resolve
-    MT_ERR_TEXT,    // text NULL or not valid UTF-8
-    MT_ERR_OOM,     // out of memory
-    MT_ERR_BACKEND  // the platform text engine refused the request
+    MT_ERR_FONT,     // font handle NULL, or the family/data did not resolve
+    MT_ERR_TEXT,     // text NULL or not valid UTF-8
+    MT_ERR_OOM,      // out of memory
+    MT_ERR_BACKEND,  // the platform text engine refused the request
+    MT_ERR_INVALID   // a shaped, text, or block handle argument was NULL
 } mt_error;
 
 /* The error from the last microtext call. Process-global, not per-thread (see
  * the threading note at the top of the file). */
 MICROTEXTDEF mt_error mt_last_error(void);
+
+// A short human-readable string for an error code, never NULL.
+MICROTEXTDEF const char *mt_error_string(mt_error e);
 
 /* Open a font by family name at a pixel size. NULL family uses the system UI
  * font. Returns NULL on failure (see mt_last_error). */
@@ -262,6 +266,7 @@ MICROTEXTDEF void mt_block_free(mt_block *b);
 #ifndef MICROTEXT_IMPLEMENTATION_ONCE
 #define MICROTEXT_IMPLEMENTATION_ONCE
 
+#include <assert.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -322,6 +327,25 @@ static ptrdiff_t mt_u16_to_byte(const char *t, int nbytes, ptrdiff_t u16)
         i += len;
     }
     return i;
+}
+
+MICROTEXTDEF const char *mt_error_string(mt_error e)
+{
+    switch (e) {
+        case MT_OK:
+            return "no error";
+        case MT_ERR_FONT:
+            return "font not found or invalid";
+        case MT_ERR_TEXT:
+            return "text null or not valid UTF-8";
+        case MT_ERR_OOM:
+            return "out of memory";
+        case MT_ERR_BACKEND:
+            return "platform text engine refused the request";
+        case MT_ERR_INVALID:
+            return "null or unusable handle argument";
+    }
+    return "unknown error";
 }
 
 /* A backend implements the platform block below: open/close a font, shape a run
@@ -635,10 +659,11 @@ MICROTEXTDEF unsigned char *mt_shaped_render(const mt_shaped *s,
                                              int *out_h, mt_metrics *out_m)
 {
     if (!s) {
-        mt_err = MT_ERR_FONT;
+        mt_err = MT_ERR_INVALID;
         return NULL;
     }
     int w = s->w, h = s->h;
+    assert(w > 0 && h > 0);
     unsigned char *buf = dst;
     if (!buf) {
         buf = (unsigned char *)MICROTEXT_MALLOC((size_t)w * h * 4);
@@ -705,7 +730,7 @@ static CFIndex mt_line_u16(const mt_shaped *s, ptrdiff_t byte_off)
 MICROTEXTDEF float mt_shaped_caret_x(const mt_shaped *s, ptrdiff_t byte_off)
 {
     if (!s) {
-        mt_err = MT_ERR_FONT;
+        mt_err = MT_ERR_INVALID;
         return 0.0f;
     }
     CFIndex idx = mt_line_u16(s, byte_off);
@@ -717,7 +742,7 @@ MICROTEXTDEF float mt_shaped_caret_x(const mt_shaped *s, ptrdiff_t byte_off)
 MICROTEXTDEF ptrdiff_t mt_shaped_byte_at_x(const mt_shaped *s, float x)
 {
     if (!s) {
-        mt_err = MT_ERR_FONT;
+        mt_err = MT_ERR_INVALID;
         return 0;
     }
     CFIndex idx =
@@ -734,7 +759,7 @@ MICROTEXTDEF int mt_shaped_selection(const mt_shaped *s, ptrdiff_t a,
                                      ptrdiff_t b, float *out, int max_pairs)
 {
     if (!s) {
-        mt_err = MT_ERR_FONT;
+        mt_err = MT_ERR_INVALID;
         return 0;
     }
     mt_err = MT_OK;
@@ -909,8 +934,12 @@ MICROTEXTDEF int mt_text_run(mt_text *t, const char *utf8, ptrdiff_t len,
                              const mt_font *f, mt_color color,
                              const char *features)
 {
-    if (!t || !f) {
+    if (!f) {
         mt_err = MT_ERR_FONT;
+        return -1;
+    }
+    if (!t) {
+        mt_err = MT_ERR_INVALID;
         return -1;
     }
     if (!utf8) {
@@ -1011,7 +1040,7 @@ static int mt_break_len(const UniChar *c, CFIndex i, CFIndex total)
 MICROTEXTDEF mt_block *mt_text_wrap(const mt_text *t, float max_width)
 {
     if (!t) {
-        mt_err = MT_ERR_TEXT;
+        mt_err = MT_ERR_INVALID;
         return NULL;
     }
     mt_block *b = (mt_block *)MICROTEXT_MALLOC(sizeof(*b));

@@ -531,7 +531,15 @@ int main(void)
         mt_last_error() != MT_ERR_FONT) {
         pass = 0;
     }
-    printf("%s  error channel (TEXT/TEXT/FONT distinguished)\n", CHECK(pass));
+    if (mt_shaped_render(NULL, NULL, &w, &h, NULL) != NULL ||
+        mt_last_error() != MT_ERR_INVALID) {
+        pass = 0;
+    }
+    if (!mt_error_string(MT_ERR_INVALID) || !mt_error_string((mt_error)999)) {
+        pass = 0;
+    }
+    printf("%s  error channel (TEXT/TEXT/FONT/INVALID distinguished)\n",
+           CHECK(pass));
     {
         // malformed UTF-8 is rejected with MT_ERR_TEXT, not shaped
         static const char *const malformed[] = {

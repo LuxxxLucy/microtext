@@ -60,6 +60,7 @@ Not thread-safe: the last-error slot and an internal sRGB color space are proces
 | `mt_render(f, utf8, len, color, &w, &h, &m)` | Lay out and rasterize a run to a malloc'd RGBA bitmap. |
 | `mt_free(p)` | Free a rendered bitmap. |
 | `mt_last_error()` | The error from the last call (`mt_error`), process-global. |
+| `mt_error_string(e)` | A short human-readable string for an `mt_error`, never `NULL`. |
 
 `len < 0` means NUL-terminated. `color` tints non-color glyphs; color emoji keep their own colors.
 
@@ -140,7 +141,7 @@ An `mt_block` line's bytes include any trailing hard-break character; a single `
 | `mt_color` | `{ unsigned char r, g, b, a; }`. |
 | `mt_metrics` | `width`, `height`, `ascent`, `descent`, `leading` (float); `origin_x`, `origin_y` (int pen origin); `align_dx` (float alignment shift). |
 | `mt_align` | `MT_ALIGN_LEFT`, `MT_ALIGN_RIGHT`, `MT_ALIGN_CENTER`, `MT_ALIGN_JUSTIFY`. |
-| `mt_error` | `MT_OK`, `MT_ERR_FONT`, `MT_ERR_TEXT`, `MT_ERR_OOM`, `MT_ERR_BACKEND`. |
+| `mt_error` | `MT_OK`, `MT_ERR_FONT`, `MT_ERR_TEXT`, `MT_ERR_OOM`, `MT_ERR_BACKEND`, `MT_ERR_INVALID`. |
 | `MICROTEXT_VERSION` | Compile-time feature level, for `#if MICROTEXT_VERSION >= N` checks. |
 
 ## Scope and non-goals
