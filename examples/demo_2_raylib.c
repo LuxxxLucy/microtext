@@ -5,7 +5,7 @@
 
 #include "raylib.h"
 
-#define MAX_LINES 32 // per-paragraph line cap
+#define MAX_LINES 32  // per-paragraph line cap
 
 // A wrapped block baked to one texture per line, laid out once.
 typedef struct {

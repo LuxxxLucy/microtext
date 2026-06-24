@@ -25,7 +25,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     mt_shaped *s = mt_shape(f, (const char *)data, (ptrdiff_t)size, ink);
     if (s) {
         ptrdiff_t n = (ptrdiff_t)size;
-        for (ptrdiff_t i = -2; i <= n + 2; i++) { // in- and out-of-range
+        for (ptrdiff_t i = -2; i <= n + 2; i++) {  // in- and out-of-range
             float x = mt_shaped_caret_x(s, i);
             mt_shaped_byte_at_x(s, x);
         }
@@ -37,7 +37,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     return 0;
 }
 
-#ifndef MICROTEXT_LIBFUZZER // libFuzzer supplies its own main
+#ifndef MICROTEXT_LIBFUZZER  // libFuzzer supplies its own main
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

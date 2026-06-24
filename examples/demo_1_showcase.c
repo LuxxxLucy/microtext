@@ -11,11 +11,11 @@
 
 #define W 1040
 #define H 812
-#define CAP_X 48   // caption column
-#define SAMP_X 300 // sample column
+#define CAP_X 48    // caption column
+#define SAMP_X 300  // sample column
 #define OUT_PNG "build/output/showcase.png"
 
-static unsigned char *cv; // W*H opaque RGBA canvas
+static unsigned char *cv;  // W*H opaque RGBA canvas
 
 // Composite a straight-alpha RGBA bitmap onto the opaque canvas at (x, y).
 static void over(int x, int y, const unsigned char *src, int sw, int sh)
@@ -96,7 +96,7 @@ int main(void)
     run_base(title, "microtext", ink, CAP_X, 92);
     run_base(body, "native text shaping in one header", sub, CAP_X, 140);
 
-    int b = 232; // running baseline
+    int b = 232;  // running baseline
     const int step = 62;
 
     run_base(cap, "mixed scripts, fallback", gray, CAP_X, b);
