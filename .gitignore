@@ -2,3 +2,6 @@ build/output/
 *.o
 *.dSYM/
 .DS_Store
+
+# fetched third-party test headers
+tests/3rd/

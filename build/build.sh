@@ -14,8 +14,18 @@ MAC_FW="-framework CoreText -framework CoreGraphics -framework CoreFoundation"
 
 mkdir -p "$OUT"
 
-build_test()   { $CC $CFLAGS tests/test_dump.c -o "$OUT/test_dump" $MAC_FW; }
-build_golden() { $CC $CFLAGS tests/golden.c -o "$OUT/golden_test" $MAC_FW; }
+# stb single-file headers are fetched on demand, not vendored.
+STB_REV="31c1ad37456438565541f4919958214b6e762fb4"
+fetch_3rd() {
+    mkdir -p tests/3rd
+    for h in stb_image.h stb_image_write.h; do
+        [ -f "tests/3rd/$h" ] || curl -fsSL \
+            "https://raw.githubusercontent.com/nothings/stb/$STB_REV/$h" -o "tests/3rd/$h"
+    done
+}
+
+build_test()   { fetch_3rd; $CC $CFLAGS tests/test_dump.c -o "$OUT/test_dump" $MAC_FW; }
+build_golden() { fetch_3rd; $CC $CFLAGS tests/golden.c -o "$OUT/golden_test" $MAC_FW; }
 build_fuzz()   { $CC $SANFLAGS tests/fuzz.c -o "$OUT/fuzz" $MAC_FW; }
 build_demo1()  { $CC $CFLAGS examples/demo_1_showcase.c -o "$OUT/demo_1_showcase" $MAC_FW; }
 build_demo2()  {
@@ -36,6 +46,7 @@ test)
     build_test && "$OUT/test_dump"
     ;;
 sanitize)
+    fetch_3rd
     $CC $SANFLAGS tests/test_dump.c -o "$OUT/test_dump_san" $MAC_FW
     "$OUT/test_dump_san"
     ;;
