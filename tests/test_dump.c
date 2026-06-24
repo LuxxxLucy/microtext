@@ -44,9 +44,10 @@ static void composite_block(mt_block *b, const char *path)
     int n = mt_block_lines(b);
     int W = 1, H = 0;
     for (int i = 0; i < n; i++) {
-        mt_metrics m = mt_shaped_metrics(mt_block_line(b, i));
+        const mt_shaped *ln = mt_block_line(b, i);
+        mt_metrics m = mt_shaped_metrics(ln);
         int lw, lh;
-        mt_shaped_size(mt_block_line(b, i), &lw, &lh);
+        mt_shaped_size(ln, &lw, &lh);
         if (lw > W) {
             W = lw;
         }
@@ -112,15 +113,15 @@ int main(void)
     mt_color ink = { 20, 20, 20, 255 };
     mt_color red = { 220, 30, 30, 255 };
 
-    dump(f, "Ap Red", red, "out_latin.png");           // orientation + color
-    dump(f, "中文 日本語 한국어", ink, "out_cjk.png"); // CJK fallback
-    dump(f, "العربية", ink, "out_arabic.png");         // RTL bidi + shaping
+    dump(f, "Ap Red", red, "out_latin.png");            // orientation + color
+    dump(f, "中文 日本語 한국어", ink, "out_cjk.png");  // CJK fallback
+    dump(f, "العربية", ink, "out_arabic.png");          // RTL bidi + shaping
     dump(f,
          "Hello مرحبا \U0001F30D 世界 "
          "\U0001F3B5",
-         ink, "out_mixed.png"); // bidi + emoji + CJK
+         ink, "out_mixed.png");  // bidi + emoji + CJK
     dump(f, "\U0001F3B5\U0001F525\U0001F30D\U0001F600\U0001F44D", ink,
-         "out_emoji.png"); // color emoji
+         "out_emoji.png");  // color emoji
 
     mt_font *bold = mt_font_open_styled("Helvetica Neue", 64.0f, 1, 0);
     mt_font *ital = mt_font_open_styled("Helvetica Neue", 64.0f, 0, 1);
@@ -131,7 +132,7 @@ int main(void)
         SKIP("bold face unavailable");
     }
     if (ital) {
-        dump(ital, "Italic fy", ink, "out_italic.png"); // overhang stress
+        dump(ital, "Italic fy", ink, "out_italic.png");  // overhang stress
         mt_font_close(ital);
     } else {
         SKIP("italic face unavailable");
@@ -169,7 +170,7 @@ int main(void)
         mt_text_run(t, "Bold ", -1, rb, red, NULL);
         mt_text_run(t, "中文 ", -1, f, ink, NULL);
         mt_text_run(t, "regular runs.", -1, f, ink, NULL);
-        mt_block *b = mt_text_wrap(t, 0.0f); // one line
+        mt_block *b = mt_text_wrap(t, 0.0f);  // one line
         printf("%s  rich one line     %d line(s)\n",
                CHECK(b && mt_block_lines(b) == 1), b ? mt_block_lines(b) : -1);
         if (b && mt_block_lines(b) >= 1) {
@@ -207,8 +208,7 @@ int main(void)
     {
         mt_text *t = mt_text_new();
         mt_text_run(t, "Line one\nLine two\n\nLine four", -1, f, ink, NULL);
-        mt_block *b =
-            mt_text_wrap(t, 0.0f); // no width wrap, only hard breaks
+        mt_block *b = mt_text_wrap(t, 0.0f);  // no width wrap, only hard breaks
         int n = b ? mt_block_lines(b) : 0;
         float blank =
             n == 4 ? mt_shaped_metrics(mt_block_line(b, 2)).height : 0;
@@ -462,7 +462,7 @@ int main(void)
             int sn = mt_shaped_selection(mt_block_line(b, 0), 0, llen, sp, 8);
             ok = sn >= 1;
             for (int i = 0; ok && i < sn; i++) {
-                if (sp[i * 2] > sp[i * 2 + 1]) { // each span is ordered
+                if (sp[i * 2] > sp[i * 2 + 1]) {  // each span is ordered
                     ok = 0;
                 }
             }
@@ -476,7 +476,7 @@ int main(void)
         // RTL line: logical index 0 sits at the right, so caret x descends
         mt_shaped *r = mt_shape(
             f, "\xD8\xA7\xD9\x84\xD8\xB9\xD8\xB1\xD8\xA8\xD9\x8A\xD8\xA9", -1,
-            ink); // العربية, 14 bytes
+            ink);  // العربية, 14 bytes
         int ok = r != NULL;
         if (r) {
             ok = mt_shaped_caret_x(r, 0) > mt_shaped_caret_x(r, 14) + 1.0f;
@@ -543,12 +543,12 @@ int main(void)
     {
         // malformed UTF-8 is rejected with MT_ERR_TEXT, not shaped
         static const char *const malformed[] = {
-            "\x80",                 // lone continuation byte
-            "\xC3",                 // truncated 2-byte sequence
-            "\xE4\xB8",             // truncated 3-byte sequence
-            "\xC0\x80",             // overlong encoding
-            "\xED\xA0\x80",         // lone surrogate U+D800
-            "\xF8\x88\x80\x80\x80", // 5-byte sequence
+            "\x80",                  // lone continuation byte
+            "\xC3",                  // truncated 2-byte sequence
+            "\xE4\xB8",              // truncated 3-byte sequence
+            "\xC0\x80",              // overlong encoding
+            "\xED\xA0\x80",          // lone surrogate U+D800
+            "\xF8\x88\x80\x80\x80",  // 5-byte sequence
         };
         int bad_ok = 1;
         size_t cases = sizeof(malformed) / sizeof(malformed[0]);
