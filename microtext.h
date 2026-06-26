@@ -40,6 +40,8 @@
  * signature change, so a higher value is a strict superset of a lower one. */
 #define MICROTEXT_VERSION 5
 
+#define MICROTEXT_VERSION_STR "0.1.0"
+
 /* Linkage of the public functions, stb-style. The default is external linkage.
  * Define MICROTEXT_STATIC before including to fold the implementation privately
  * into one translation unit, or define MICROTEXTDEF yourself for custom linkage
